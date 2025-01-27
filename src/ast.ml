@@ -1,4 +1,3 @@
-
 (** {2 Abstract Syntax of Mini Java} *)
 
 (** {3 Parsed trees}
@@ -87,7 +86,7 @@ type typ =
 
 and class_ = {
   class_name      : string;
-  mutable class_extends   : class_;
+  mutable class_extends   : class_ option;
   class_methods   : (string, method_  ) Hashtbl.t;
   class_attributes: (string, attribute) Hashtbl.t;
 }
