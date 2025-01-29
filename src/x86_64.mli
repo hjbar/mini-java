@@ -1,15 +1,13 @@
 (** {0 Bibliothèque pour l'écriture de programmes X86-64}
 
-    Il s'agit là uniquement d'un fragment relativement petit de l'assembleur
-    X86-64.
+    Il s'agit là uniquement d'un fragment relativement petit de l'assembleur X86-64.
 
     @author Jean-Christophe Filliâtre (CNRS)
     @author Kim Nguyen (Université Paris Sud) *)
 
 (** {1 Code} *)
 
-(** type abstrait du code assembleur. Le paramètre ['a] est utilisé comme type
-    fantôme. *)
+(** type abstrait du code assembleur. Le paramètre ['a] est utilisé comme type fantôme. *)
 type 'a asm
 
 (** du code assembleur se trouvant dans la zone de texte *)
@@ -24,8 +22,7 @@ type label = string
 (** l'instruction vide. Peut se trouver dans du text ou du data *)
 val nop : [> ] asm
 
-(** concatène deux bouts de codes (soit text avec text, soit data avec data), en
-    temps constant *)
+(** concatène deux bouts de codes (soit text avec text, soit data avec data), en temps constant *)
 val ( ++ ) : ([< `text | `data ] asm as 'a) -> 'a -> 'a
 
 (** [inline s] recopie la chaîne [s] telle quelle dans le fichier assembleur *)
@@ -37,8 +34,7 @@ type program =
   ; data : data
   }
 
-(** [print_program fmt p] imprime le code du programme [p] dans le formatter
-    [fmt] *)
+(** [print_program fmt p] imprime le code du programme [p] dans le formatter [fmt] *)
 val print_program : Format.formatter -> program -> unit
 
 val print_in_file : file:string -> program -> unit
@@ -218,12 +214,7 @@ val reg : 'size register -> 'size operand
 val ( !% ) : 'size register -> 'size operand
 
 (** opérande indirecte ofs(register, index, scale) *)
-val ind :
-     ?ofs:int
-  -> ?index:'size1 register
-  -> ?scale:int
-  -> 'size2 register
-  -> [> ] operand
+val ind : ?ofs:int -> ?index:'size1 register -> ?scale:int -> 'size2 register -> [> ] operand
 
 (** étiquette L *)
 val lab : label -> [> ] operand
@@ -297,8 +288,7 @@ val cmovae : 'size operand -> 'size operand -> text (* >= non signé *)
 
 val cmovb : 'size operand -> 'size operand -> text (* <  non signé *)
 
-(** copie conditionnelle (attention : toutes les combinaisons d'opérandes ne
-    sont pas permises) *)
+(** copie conditionnelle (attention : toutes les combinaisons d'opérandes ne sont pas permises) *)
 val cmovbe : 'size operand -> 'size operand -> text (* <= non signé *)
 
 (** {2 Arithmétique} *)
@@ -393,8 +383,7 @@ val xorw : [ `W ] operand -> [ `W ] operand -> text
 
 val xorl : [ `L ] operand -> [ `L ] operand -> text
 
-(** Opérations de manipulation de bits. "et" bit à bit, "ou" bit à bit, "not"
-    bit à bit *)
+(** Opérations de manipulation de bits. "et" bit à bit, "ou" bit à bit, "not" bit à bit *)
 val xorq : [ `Q ] operand -> [ `Q ] operand -> text
 
 (** {2 Décalages} *)
@@ -519,8 +508,8 @@ val setbe : [ `B ] operand -> text (* <= non signé *)
 
 (** {2 Manipulation de la pile} *)
 
-(** [pushq r] place le contenu de [r] au sommet de la pile. Rappel : %rsp pointe
-    sur l'adresse de la dernière case occupée *)
+(** [pushq r] place le contenu de [r] au sommet de la pile. Rappel : %rsp pointe sur l'adresse de la
+    dernière case occupée *)
 val pushq : [ `Q ] operand -> text
 
 (** [popq r] place le mot en sommet de pile dans [r] et dépile *)
@@ -534,14 +523,13 @@ val label : label -> [> ] asm
 (** déclaration .globl (pour main, typiquement) *)
 val globl : label -> [> ] asm
 
-(** place un commentaire dans le code généré. Peut se retrouver dans du text ou
-    du data *)
+(** place un commentaire dans le code généré. Peut se retrouver dans du text ou du data *)
 val comment : string -> [> ] asm
 
-(** construit une fonction assembleur `newf` qui appelle `f` après avoir
-    correctement aligné la pile (sur un multiple de 16). Ainsi, `aligned_call
-    "malloc" "malloc_"` ajoute au code assembleur une fonction `malloc_` qu'on
-    peut appeler en tout endroit de notre code sans se soucier d'alignement. *)
+(** construit une fonction assembleur `newf` qui appelle `f` après avoir correctement aligné la pile
+    (sur un multiple de 16). Ainsi, `aligned_call "malloc" "malloc_"` ajoute au code assembleur une
+    fonction `malloc_` qu'on peut appeler en tout endroit de notre code sans se soucier
+    d'alignement. *)
 val aligned_call_wrapper : f:string -> newf:string -> text
 
 (** {2 Données} *)

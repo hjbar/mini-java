@@ -19,8 +19,7 @@ let spec =
 let file =
   let file = ref None in
   let set_file s =
-    if not (Filename.check_suffix s ".java") then
-      raise (Arg.Bad "no .java extension");
+    if not (Filename.check_suffix s ".java") then raise (Arg.Bad "no .java extension");
     file := Some s
   in
   Arg.parse spec set_file usage;
@@ -61,7 +60,7 @@ let () =
     report (lexeme_start_p lb, lexeme_end_p lb);
     eprintf "syntax error@.";
     exit 1
-  | Typing.Error (loc, s) ->
+  | Typing_utils.Error (loc, s) ->
     report loc;
     eprintf "error: %s@." s;
     exit 1
