@@ -1,0 +1,18 @@
+À faire (+ court terme) :
+
+- Intégrer la fonction Print dans le typage
+- Intégrer : "| Ustring_of_int (** integer to string conversion, introduced during type checking *)"
+
+
+À faire (+ long terme) :
+
+- Intégrer l'héritage
+- Intégrer le sous-typage
+
+
+Orga :
+
+- 3 fichiers :
+  - src/typing.ml ==> les fonctions principales (les plus légères possibles)
+  - src/typing_utils.ml ==> fonctions utiles et triviales
+  - src/typing_algo.ml ==> fonctions utiles et plus grosses
