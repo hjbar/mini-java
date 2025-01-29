@@ -86,7 +86,7 @@ type typ =
 
 and class_ = {
   class_name      : string;
-  mutable class_extends   : class_ option;
+  mutable class_extends   : class_;
   class_methods   : (string, method_  ) Hashtbl.t;
   class_attributes: (string, attribute) Hashtbl.t;
 }
