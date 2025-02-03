@@ -1,7 +1,6 @@
 À faire (+ court terme) :
 
-- Intégrer la fonction Print dans le typage
-- Intégrer : "| Ustring_of_int (** integer to string conversion, introduced during type checking *)"
+- Peut-être remplacer la variable globale pour stocker this par le stocker dans la hashtbl
 
 
 À faire (+ long terme) :
