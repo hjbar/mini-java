@@ -43,10 +43,16 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       make_expr (Ebinop (op, e1, e2)) Tboolean
     | Badd ->
       if e1.expr_type = Tint && e2.expr_type = Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
-      else if
-        (e1.expr_type = Tclass class_String && e2.expr_type = Tint)
-        || (e1.expr_type = Tint && e2.expr_type = Tclass class_String)
-      then make_expr (Ebinop (Badd_s, e1, e2)) (Tclass class_String)
+      else if e1.expr_type = Tclass class_String && e2.expr_type = Tclass class_String then
+        make_expr (Ebinop (Badd_s, e1, e2)) (Tclass class_String)
+      else if e1.expr_type = Tint && e2.expr_type = Tclass class_String then
+        make_expr
+          (Ebinop (Badd_s, make_expr (Eunop (Ustring_of_int, e1)) (Tclass class_String), e2))
+          (Tclass class_String)
+      else if e1.expr_type = Tclass class_String && e2.expr_type = Tint then
+        make_expr
+          (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) (Tclass class_String)))
+          (Tclass class_String)
       else error ~loc "Invalid_argument for +"
     | Badd_s -> assert false
   end
