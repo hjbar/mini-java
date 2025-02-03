@@ -1,3 +1,4 @@
 lexer.ml
 parser.ml
 ast.ml
+tests/split.ml
