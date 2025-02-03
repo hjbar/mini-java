@@ -154,19 +154,27 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     List.iter2 (fun e v -> check_type v.var_type e.expr_type) typed_args constr.meth_params;
 
     make_expr (Enew (cls, typed_args)) constr.meth_type
-  | PEcall (c, name, args) ->
-    let typed_c = type_expr env c in
+  | PEcall (c, name, args) -> begin
+    match name.id with
+    | "print" when is_system_out c -> begin
+      match args with
+      | [ expr ] -> make_expr (Eprint (type_expr env expr)) Tvoid
+      | _ -> error ~loc:name.loc "print function need exactly one argument"
+    end
+    | _ ->
+      let typed_c = type_expr env c in
 
-    let cls = get_class_type typed_c.expr_type in
-    if not @@ has_method name.id cls then error ~loc:name.loc "%s is not a correct method" name.id;
+      let cls = get_class_type typed_c.expr_type in
+      if not @@ has_method name.id cls then error ~loc:name.loc "%s is not a correct method" name.id;
 
-    let meth = get_method name.id cls in
-    let typed_args = List.map (type_expr env) args in
+      let meth = get_method name.id cls in
+      let typed_args = List.map (type_expr env) args in
 
-    (* TODO : utiliser le sous-typage *)
-    List.iter2 (fun e v -> check_type v.var_type e.expr_type) typed_args meth.meth_params;
+      (* TODO : utiliser le sous-typage *)
+      List.iter2 (fun e v -> check_type v.var_type e.expr_type) typed_args meth.meth_params;
 
-    make_expr (Ecall (typed_c, meth, typed_args)) typed_c.expr_type
+      make_expr (Ecall (typed_c, meth, typed_args)) typed_c.expr_type
+  end
   | PEcast (typ, e) ->
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
@@ -234,13 +242,16 @@ let type_decl (id : string) (decls : pdecl list) : decl list =
     | PDattribute _ -> acc
     | PDconstructor (name, params, block) ->
       let vars = pparams_to_vars classes params in
-      let block = type_stmt (Hashtbl.create 16) block in
+      let env = Hashtbl.create 16 in
+      List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
+      let block = type_stmt env block in
       Dconstructor (vars, block) :: acc
     | PDmethod (typ_opt, name, params, block) ->
-      let m =
-        make_method name.id (get_typ_opt classes typ_opt) (pparams_to_vars classes params) ~-1
-      in
-      let block = type_stmt (Hashtbl.create 16) block in
+      let vars = pparams_to_vars classes params in
+      let m = make_method name.id (get_typ_opt classes typ_opt) vars ~-1 in
+      let env = Hashtbl.create 16 in
+      List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
+      let block = type_stmt env block in
       Dmethod (m, block) :: acc
   in
   List.fold_left (loop classes) [] decls

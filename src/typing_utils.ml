@@ -31,6 +31,15 @@ let class_String =
   ; class_attributes = Hashtbl.create 16
   }
 
+(* Build-in functons *)
+
+let is_system_out c =
+  match c.pexpr_desc with
+  | PEdot (pexpr, id_out) when id_out.id = "out" -> begin
+    match pexpr.pexpr_desc with PEident id_sys when id_sys.id = "System" -> true | _ -> false
+  end
+  | _ -> false
+
 (* Types *)
 
 type classes = (string, class_) Hashtbl.t
