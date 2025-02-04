@@ -1,6 +1,7 @@
 	.text
 	.globl	main
 main:
-	call C_Main_main
+	call M_Main_main
 	ret
+M_Main_main:
 	.data

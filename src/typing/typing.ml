@@ -148,7 +148,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       error ~loc:name.loc "%s is not a correct constructor" name.id;
 
     let constr = get_method name.id cls in
-    let typed_args = List.map (type_expr env) args in
+    let typed_args = type_exprs env args in
 
     (* TODO: utiliser le sous-typage *)
     List.iter2 (fun e v -> check_type v.var_type e.expr_type) typed_args constr.meth_params;
@@ -168,7 +168,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       if not @@ has_method name.id cls then error ~loc:name.loc "%s is not a correct method" name.id;
 
       let meth = get_method name.id cls in
-      let typed_args = List.map (type_expr env) args in
+      let typed_args = type_exprs env args in
 
       (* TODO : utiliser le sous-typage *)
       List.iter2 (fun e v -> check_type v.var_type e.expr_type) typed_args meth.meth_params;
@@ -192,6 +192,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       make_expr (Einstanceof (typed_e, (get_class_type typ).class_name)) Tboolean
     end
     else error ~loc "We have type %s, but Class or Null expected" (typ_to_string typ)
+
+and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (type_expr env) exprs
 
 (* Typing stmt *)
 
@@ -221,7 +223,7 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : stmt =
 
     Sif (typed_e, typed_s1, typed_s2)
   | PSreturn e_opt -> Sreturn (Option.map (type_expr env) e_opt)
-  | PSblock block -> Sblock (List.map (type_stmt env) block)
+  | PSblock block -> Sblock (type_stmts env block)
   | PSfor (s1, e, s2, s3) ->
     let typed_s1 = type_stmt env s1 in
 
@@ -233,28 +235,40 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : stmt =
 
     Sfor (typed_s1, typed_e, typed_s2, typed_s3)
 
+and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list = List.map (type_stmt env) stmts
+
 (* Typing decl *)
 
-let type_decl (id : string) (decls : pdecl list) : decl list =
+let type_decl : pdecl -> decl = function
+  | PDattribute _ -> assert false
+  | PDconstructor (name, params, block) ->
+    let vars = pparams_to_vars classes params in
+    let env = Hashtbl.create 16 in
+    List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
+    let block = type_stmt env block in
+    Dconstructor (vars, block)
+  | PDmethod (typ_opt, name, params, block) ->
+    let vars = pparams_to_vars classes params in
+    let m = make_method name.id (get_typ_opt classes typ_opt) vars ~-1 in
+    let env = Hashtbl.create 16 in
+    List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
+    let block = type_stmt env block in
+    Dmethod (m, block)
+
+let type_decls (id : string) (decls : pdecl list) : decl list =
   current_class := Hashtbl.find classes id;
 
-  let loop (classes : classes) (acc : decl list) : pdecl -> decl list = function
-    | PDattribute _ -> acc
-    | PDconstructor (name, params, block) ->
-      let vars = pparams_to_vars classes params in
-      let env = Hashtbl.create 16 in
-      List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
-      let block = type_stmt env block in
-      Dconstructor (vars, block) :: acc
-    | PDmethod (typ_opt, name, params, block) ->
-      let vars = pparams_to_vars classes params in
-      let m = make_method name.id (get_typ_opt classes typ_opt) vars ~-1 in
-      let env = Hashtbl.create 16 in
-      List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
-      let block = type_stmt env block in
-      Dmethod (m, block) :: acc
-  in
-  List.fold_left (loop classes) [] decls
+  List.fold_left
+    (fun acc decl -> match decl with PDattribute _ -> acc | _ -> type_decl decl :: acc)
+    [] decls
+  |> List.rev
+
+(* Typing class *)
+
+let type_class ((id, _parent, decls) : pclass) : tclass =
+  (Hashtbl.find classes id.id, type_decls id.id decls)
+
+let type_classes (p : pfile) : tfile = List.map type_class p
 
 (* Main *)
 
@@ -264,4 +278,4 @@ let file ?debug:(b = false) (p : pfile) : tfile =
 
   init_classes classes p;
   List.iter (fun (id, _parent, decls) -> update_class classes (Hashtbl.find classes id.id) decls) p;
-  List.map (fun (id, _parent, decls) -> (Hashtbl.find classes id.id, type_decl id.id decls)) p
+  type_classes p

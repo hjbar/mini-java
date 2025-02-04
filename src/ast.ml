@@ -2,22 +2,35 @@
 
 (** {3 Parsed trees}
 
-   This is the output of the parser and the input of the type checker. *)
+    This is the output of the parser and the input of the type checker. *)
 
 type location = Lexing.position * Lexing.position
 
-type ident = { loc : location; id : string }
+type ident =
+  { loc : location
+  ; id : string
+  }
 
 type unop =
-  | Uneg (** -e *) | Unot (** !e *)
-  | Ustring_of_int (** integer to string conversion,
-                       introduced during type checking *)
+  | Uneg  (** -e *)
+  | Unot  (** !e *)
+  | Ustring_of_int  (** integer to string conversion, introduced during type checking *)
 
 type binop =
-  | Badd | Bsub | Bmul | Bdiv | Bmod   (** + - * / % *)
-  | Beq | Bneq | Blt | Ble | Bgt | Bge (** == != < <= > >= *)
-  | Band | Bor                         (** && || *)
-  | Badd_s (** string concatenation, introduced during type checking *)
+  | Badd
+  | Bsub
+  | Bmul
+  | Bdiv
+  | Bmod  (** + - * / % *)
+  | Beq
+  | Bneq
+  | Blt
+  | Ble
+  | Bgt
+  | Bge  (** == != < <= > >= *)
+  | Band
+  | Bor  (** && || *)
+  | Badd_s  (** string concatenation, introduced during type checking *)
 
 type constant =
   | Cbool of bool
@@ -30,8 +43,9 @@ type pexpr_typ =
   | PTident of ident
 
 type pexpr =
-  { pexpr_desc : pexpr_desc;
-    pexpr_loc  : location; }
+  { pexpr_desc : pexpr_desc
+  ; pexpr_loc : location
+  }
 
 and pexpr_desc =
   | PEconstant of constant
@@ -49,8 +63,9 @@ and pexpr_desc =
   | PEinstanceof of pexpr * pexpr_typ
 
 type pstmt =
-  { pstmt_desc : pstmt_desc;
-    pstmt_loc  : location; }
+  { pstmt_desc : pstmt_desc
+  ; pstmt_loc : location
+  }
 
 and pstmt_desc =
   | PSexpr of pexpr
@@ -71,11 +86,9 @@ type pclass = ident * ident option * pdecl list
 
 type pfile = pclass list
 
-
 (** {3 Typed trees}
 
-   This is the output of the type checker and the input of the code
-   generation. *)
+    This is the output of the type checker and the input of the code generation. *)
 
 type typ =
   | Tvoid
@@ -84,39 +97,38 @@ type typ =
   | Tint
   | Tclass of class_
 
-and class_ = {
-  class_name      : string;
-  mutable class_extends   : class_;
-  class_methods   : (string, method_  ) Hashtbl.t;
-  class_attributes: (string, attribute) Hashtbl.t;
-}
+and class_ =
+  { class_name : string
+  ; mutable class_extends : class_
+  ; class_methods : (string, method_) Hashtbl.t
+  ; class_attributes : (string, attribute) Hashtbl.t
+  }
 
-and attribute = {
-  attr_name : string;
-  attr_type : typ;
-  mutable attr_ofs : int; (** position within the object *)
-}
-  (** All the occurrences of the same attribute
-      point to a single record of the following type. *)
+(** All the occurrences of the same attribute point to a single record of the following type. *)
+and attribute =
+  { attr_name : string
+  ; attr_type : typ
+  ; mutable attr_ofs : int  (** position within the object *)
+  }
 
-and method_ = {
-  meth_name  : string; (** unique name *)
-  meth_type  : typ;
-  meth_params: var list;
-  mutable meth_ofs : int; (** position within the method table *)
-}
+and method_ =
+  { meth_name : string  (** unique name *)
+  ; meth_type : typ
+  ; meth_params : var list
+  ; mutable meth_ofs : int  (** position within the method table *)
+  }
 
-and var = {
-  var_name : string;
-  var_type : typ;
-  mutable var_ofs : int;  (** position wrt %rbp *)
-}
-  (** All the occurrences of the same variable
-      point to a single record of the following type. *)
+(** All the occurrences of the same variable point to a single record of the following type. *)
+and var =
+  { var_name : string
+  ; var_type : typ
+  ; mutable var_ofs : int  (** position wrt %rbp *)
+  }
 
 type expr =
-  { expr_desc : expr_desc;
-    expr_type : typ; }
+  { expr_desc : expr_desc
+  ; expr_type : typ
+  }
 
 and expr_desc =
   | Econstant of constant
