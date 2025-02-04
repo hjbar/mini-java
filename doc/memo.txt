@@ -1,6 +1,8 @@
 À faire (+ court terme) :
 
 - Peut-être remplacer la variable globale pour stocker this par le stocker dans la hashtbl
+- Vérfier que le main existe bel et bien
+- Regarder si les variables sont bien init quand on les utilise
 
 
 À faire (+ long terme) :
