@@ -6,43 +6,67 @@ open Ast
 open Compile_utils
 open Compile_algo
 
+(* Data *)
+
+let data_queue : data_queue = Queue.create ()
+
 (* Compile expr *)
 
-let rec compile_expr (e : Ast.expr) : X86_64.text =
+let rec compile_expr (e : expr) : text =
   match e.expr_desc with
-  | Econstant cst -> nop
-  | Eprint expr -> nop
+  | Econstant (Cstring s as cst) ->
+    Queue.push (get_label_data (), cst) data_queue;
+    nop
+  | Eprint expr -> compile_expr expr ++ compile_printf (new_label_data ())
   | _ -> failwith "Others expr todo"
 
 (* Compile stmt *)
 
-let rec compile_stmt : Ast.stmt -> X86_64.text = function
+let rec compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr
   | Sblock stmts -> compile_stmts stmts
   | _ -> failwith "Others stmt todo"
 
-and compile_stmts (stmts : Ast.stmt list) =
+and compile_stmts (stmts : stmt list) =
   List.fold_left (fun acc stmt -> acc ++ compile_stmt stmt) nop stmts
 
 (* Compile decl *)
 
-let compile_decl (cls : Ast.class_) : Ast.decl -> X86_64.text = function
+let compile_decl (cls : class_) : decl -> text = function
   | Dconstructor (vars, stmt) -> failwith "Dconstructor todo"
-  | Dmethod (meth, stmt) -> get_label_meth cls meth ++ compile_stmt stmt
+  | Dmethod (meth, stmt) ->
+    get_label_meth cls meth ++ compile_stmt stmt ++ if is_type_void meth.meth_type then ret else nop
 
-let compile_decls (cls : Ast.class_) (decls : Ast.decl list) =
+let compile_decls (cls : class_) (decls : decl list) =
   List.fold_left (fun acc decl -> acc ++ compile_decl cls decl) nop decls
 
 (* Compile class *)
 
-let compile_class ((cls, decls) : Ast.tclass) : X86_64.text = compile_decls cls decls
+let compile_class ((cls, decls) : tclass) : text = compile_decls cls decls
 
-let compile_classes (p : Ast.tfile) =
+let compile_classes (p : tfile) =
   List.fold_left (fun acc class_ -> acc ++ compile_class class_) nop p
+
+(* Compile data *)
+
+let compile_data () : data =
+  Queue.fold
+    begin
+      fun acc (label_name, cst) ->
+        acc ++ label label_name
+        ++
+        match cst with
+        | Cstring s -> string s
+        | _ -> failwith "more cst in match in compile_data TODO"
+    end
+    nop data_queue
 
 (* Main *)
 
-let file ?debug:(b = false) (p : Ast.tfile) : X86_64.program =
+let file ?debug:(b = false) (p : tfile) : program =
   debug := b;
 
-  { text = globl "main" ++ label "main" ++ call label_main ++ ret ++ compile_classes p; data = nop }
+  let text = globl "main" ++ label "main" ++ call label_main ++ ret ++ compile_classes p in
+  let data = compile_data () in
+
+  { text; data }

@@ -7,6 +7,12 @@ open Ast
 
 let debug = ref false
 
+(* Type *)
+
+type data_queue = (string * constant) Queue.t
+
+let is_type_void = function Tvoid -> true | _ -> false
+
 (* Label *)
 
 let label_main = "M_Main_main"
