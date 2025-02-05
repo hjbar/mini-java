@@ -1,19 +1,13 @@
 À faire (+ court terme) :
 
 - Peut-être remplacer la variable globale pour stocker this par le stocker dans la hashtbl
-- Vérfier que le main existe bel et bien
+- Vérfier que le main existe bel et bien (peut-être fait au parsing ?)
 - Regarder si les variables sont bien init quand on les utilise
+- s'occuper des returns
+- s'occuper des scopes (avec les blocks)
 
 
 À faire (+ long terme) :
 
 - Intégrer l'héritage
 - Intégrer le sous-typage
-
-
-Orga :
-
-- 3 fichiers :
-  - src/typing.ml ==> les fonctions principales (les plus légères possibles)
-  - src/typing_utils.ml ==> fonctions utiles et triviales
-  - src/typing_algo.ml ==> fonctions utiles et plus grosses

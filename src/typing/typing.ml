@@ -8,7 +8,7 @@ open Typing_algo
 
 let current_class = ref class_Object
 
-let classes : classes = Hashtbl.create 16
+let classes : classes = init_classes_env ()
 
 (* Typing expr *)
 
@@ -42,14 +42,14 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       check_type ~loc:loc2 Tboolean e2.expr_type;
       make_expr (Ebinop (op, e1, e2)) Tboolean
     | Badd ->
-      if e1.expr_type = Tint && e2.expr_type = Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
-      else if e1.expr_type = Tclass class_String && e2.expr_type = Tclass class_String then
+      if e1.expr_type =* Tint && e2.expr_type =* Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
+      else if e1.expr_type =* Tclass class_String && e2.expr_type =* Tclass class_String then
         make_expr (Ebinop (Badd_s, e1, e2)) (Tclass class_String)
-      else if e1.expr_type = Tint && e2.expr_type = Tclass class_String then
+      else if e1.expr_type =* Tint && e2.expr_type =* Tclass class_String then
         make_expr
           (Ebinop (Badd_s, make_expr (Eunop (Ustring_of_int, e1)) (Tclass class_String), e2))
           (Tclass class_String)
-      else if e1.expr_type = Tclass class_String && e2.expr_type = Tint then
+      else if e1.expr_type =* Tclass class_String && e2.expr_type =* Tint then
         make_expr
           (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) (Tclass class_String)))
           (Tclass class_String)
@@ -144,10 +144,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Eassign_attr (e1, attr, e2)) attr.attr_type
   | PEnew (name, args) ->
     let cls = Hashtbl.find classes name.id in
-    if not @@ has_method name.id cls then
-      error ~loc:name.loc "%s is not a correct constructor" name.id;
-
-    let constr = get_method name.id cls in
+    let constr = get_method name.id name.loc args cls in
     let typed_args = type_exprs env args in
 
     (* TODO: utiliser le sous-typage *)
@@ -165,9 +162,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       let typed_c = type_expr env c in
 
       let cls = get_class_type typed_c.expr_type in
-      if not @@ has_method name.id cls then error ~loc:name.loc "%s is not a correct method" name.id;
-
-      let meth = get_method name.id cls in
+      let meth = get_method name.id name.loc args cls in
       let typed_args = type_exprs env args in
 
       (* TODO : utiliser le sous-typage *)
@@ -186,7 +181,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
   | PEinstanceof (e, typ) ->
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
-    if is_class_type typ || typ = Tnull then begin
+    if is_class_type typ || typ =* Tnull then begin
       (* TODO: utiliser le sous-typage *)
       check_type typ typed_e.expr_type;
       make_expr (Einstanceof (typed_e, (get_class_type typ).class_name)) Tboolean
@@ -242,16 +237,12 @@ and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list = List.map (t
 let type_decl : pdecl -> decl = function
   | PDattribute _ -> assert false
   | PDconstructor (name, params, block) ->
-    let vars = pparams_to_vars classes params in
-    let env = Hashtbl.create 16 in
-    List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
+    let vars, env = env_from_params classes params in
     let block = type_stmt env block in
     Dconstructor (vars, block)
   | PDmethod (typ_opt, name, params, block) ->
-    let vars = pparams_to_vars classes params in
+    let vars, env = env_from_params classes params in
     let m = make_method name.id (get_typ_opt classes typ_opt) vars ~-1 in
-    let env = Hashtbl.create 16 in
-    List.iter (fun v -> Hashtbl.replace env v.var_name v.var_type) vars;
     let block = type_stmt env block in
     Dmethod (m, block)
 
@@ -277,5 +268,5 @@ let file ?debug:(b = false) (p : pfile) : tfile =
   debug := b;
 
   init_classes classes p;
-  List.iter (fun (id, _parent, decls) -> update_class classes (Hashtbl.find classes id.id) decls) p;
+  update_classes classes p;
   type_classes p

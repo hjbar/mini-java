@@ -15,6 +15,12 @@ exception Error of location * string
 let error ?(loc = dummy_loc) f =
   Format.kasprintf (fun s -> raise (Error (loc, s))) ("@[" ^^ f ^^ "@]")
 
+(* Env *)
+
+type classes = (string, class_) Hashtbl.t
+
+type typing_env = (string, typ) Hashtbl.t
+
 (* Build-in classes *)
 
 let rec class_Object =
@@ -31,6 +37,14 @@ let class_String =
   ; class_attributes = Hashtbl.create 16
   }
 
+let init_classes_env () : classes =
+  let classes = Hashtbl.create 16 in
+
+  Hashtbl.replace classes class_Object.class_name class_Object;
+  Hashtbl.replace classes class_String.class_name class_String;
+
+  classes
+
 (* Build-in functons *)
 
 let is_system_out c =
@@ -42,10 +56,6 @@ let is_system_out c =
 
 (* Types *)
 
-type classes = (string, class_) Hashtbl.t
-
-type typing_env = (string, typ) Hashtbl.t
-
 let typ_to_string = function
   | Tvoid -> "void"
   | Tnull -> "null"
@@ -55,8 +65,16 @@ let typ_to_string = function
 
 let is_class_type : typ -> bool = function Tclass _ -> true | _ -> false
 
+let ( =* ) (typ1 : typ) (typ2 : typ) : bool =
+  match (typ1, typ2) with
+  | Tclass c1, Tclass c2 -> c1.class_name = c2.class_name
+  | Tvoid, Tvoid | Tnull, Tnull | Tint, Tint | Tboolean, Tboolean -> true
+  | _ -> false
+
+let ( <>* ) (typ1 : typ) (typ2 : typ) : bool = not (typ1 =* typ2)
+
 let check_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
-  if typ1 <> typ2 then
+  if typ1 <>* typ2 then
     error ~loc "Type %s expected, but got %s" (typ_to_string typ1) (typ_to_string typ2)
 
 (* Making some records *)
@@ -90,14 +108,18 @@ let get_attribute (id : string) (c : class_) : attribute = Hashtbl.find c.class_
 
 let has_method (id : string) (c : class_) : bool = Hashtbl.mem c.class_methods id
 
-let get_method (id : string) (c : class_) : method_ = Hashtbl.find c.class_methods id
+let exist_class (classes : classes) (c : class_) : bool = Hashtbl.mem classes c.class_name
 
 (* Conversion of types *)
 
-let get_typ (classes : classes) : pexpr_typ -> typ = function
+let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ = function
   | PTboolean -> Tboolean
   | PTint -> Tint
-  | PTident s -> Tclass (Hashtbl.find classes s.id)
+  | PTident s -> begin
+    match Hashtbl.find_opt classes s.id with
+    | None -> error ~loc "The class %s don't exist" s.id
+    | Some cls -> Tclass cls
+  end
 
 let get_typ_opt (classes : classes) : pexpr_typ option -> typ = function
   | None -> Tvoid

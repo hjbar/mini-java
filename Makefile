@@ -1,5 +1,8 @@
 
-all: clean fmt minijava.exe test
+all: clear clean fmt minijava.exe
+
+test-manual:
+	@echo "./minijava.exe --debug path_to_testfile"
 
 test-compile:
 	@cd tests && ./test -3 ../minijava.exe
@@ -15,13 +18,16 @@ minijava.exe:
 	@dune build src/minijava.exe
 	@mv _build/default/src/minijava.exe .
 
+fmt:
+	@dune fmt
+
 clean:
 	@dune clean
 	@find . -type f -name "*.exe" -delete
 	@find . -type f -name "*.s" -delete
 	@find . -type f -name "a.out" -delete
 
-fmt:
-	@dune fmt
+clear:
+	@clear
 
-.PHONY: all fmt clean minijava.exe test test-typing test-compile
+.PHONY: all clear clean fmt minijava.exe test test-typing test-compile test-manual
