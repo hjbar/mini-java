@@ -5,6 +5,7 @@
 - Regarder si les variables sont bien init quand on les utilise
 - s'occuper des returns (vérifier sans variable globale?) (ne pas faire un pré-check?)
 - s'occuper des scopes (avec les blocks) (remplacer les hashtbl par des maps)
+- Ajouter la méthode equals dans la classe build-in String
 
 
 À faire (+ long terme) :

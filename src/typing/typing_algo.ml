@@ -109,3 +109,16 @@ let verify_have_return (loc : location) (s : pstmt_desc) : unit =
 
 let verify_have_not_return (loc : location) (s : pstmt_desc) : unit =
   if have_return s then error ~loc "This method must not have a return"
+
+(* Type the args of a call *)
+
+let type_call_args type_expr env args params =
+  (* TODO : utiliser le sous-typage *)
+  List.map2
+    begin
+      fun e v ->
+        let typed_e = type_expr env e in
+        check_type ~loc:e.pexpr_loc v.var_type typed_e.expr_type;
+        typed_e
+    end
+    args params
