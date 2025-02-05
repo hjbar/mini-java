@@ -90,3 +90,22 @@ let get_method (name : string) (loc : location) (args : pexpr list) (cls : class
   if List.(length meth.meth_params <> length args) then error ~loc "incorrect number of arguments";
 
   meth
+
+(* Verify we have a return ot not *)
+
+let rec have_return : pstmt_desc -> bool = function
+  | PSreturn _ -> true
+  | PSexpr _ | PSvar _ -> false
+  | PSfor (_, e, _, _) when is_expr_false e -> false
+  | PSif (_, s1, s2) -> have_return s1.pstmt_desc && have_return s2.pstmt_desc
+  | PSblock block -> List.exists (fun s -> have_return s.pstmt_desc) block
+  | PSfor (s1, _, s2, s3) ->
+    have_return s1.pstmt_desc || have_return s2.pstmt_desc || have_return s3.pstmt_desc
+
+let have_not_return (s : pstmt_desc) : bool = not @@ have_return s
+
+let verify_have_return (loc : location) (s : pstmt_desc) : unit =
+  if have_not_return s then error ~loc "This method must have a return"
+
+let verify_have_not_return (loc : location) (s : pstmt_desc) : unit =
+  if have_return s then error ~loc "This method must not have a return"

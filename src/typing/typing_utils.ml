@@ -110,6 +110,11 @@ let has_method (id : string) (c : class_) : bool = Hashtbl.mem c.class_methods i
 
 let exist_class (classes : classes) (c : class_) : bool = Hashtbl.mem classes c.class_name
 
+(* Function on  expr *)
+
+let is_expr_false (e : pexpr) : bool =
+  match e.pexpr_desc with PEconstant (Cbool false) -> true | _ -> false
+
 (* Conversion of types *)
 
 let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ = function

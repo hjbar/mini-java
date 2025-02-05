@@ -8,6 +8,8 @@ open Typing_algo
 
 let current_class = ref class_Object
 
+let current_return_type = ref Tnull
+
 let classes : classes = init_classes_env ()
 
 (* Typing expr *)
@@ -213,13 +215,21 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : stmt =
     let typed_e = type_expr env e in
     check_type ~loc:e.pexpr_loc Tboolean typed_e.expr_type;
 
-    let typed_s1 = type_stmt env s1 in
-    let typed_s2 = type_stmt env s2 in
+    let typed_s1 = type_stmt (Hashtbl.copy env) s1 in
+    let typed_s2 = type_stmt (Hashtbl.copy env) s2 in
 
     Sif (typed_e, typed_s1, typed_s2)
-  | PSreturn e_opt -> Sreturn (Option.map (type_expr env) e_opt)
+  | PSreturn None ->
+    check_type Tvoid !current_return_type;
+    Sreturn None
+  | PSreturn (Some expr) ->
+    let expr = type_expr env expr in
+    check_type !current_return_type expr.expr_type;
+    Sreturn (Some expr)
   | PSblock block -> Sblock (type_stmts env block)
   | PSfor (s1, e, s2, s3) ->
+    let env = Hashtbl.copy env in
+
     let typed_s1 = type_stmt env s1 in
 
     let typed_e = type_expr env e in
@@ -230,25 +240,32 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : stmt =
 
     Sfor (typed_s1, typed_e, typed_s2, typed_s3)
 
-and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list = List.map (type_stmt env) stmts
+and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list =
+  let env = Hashtbl.copy env in
+  List.map (type_stmt env) stmts
 
 (* Typing decl *)
 
 let type_decl : pdecl -> decl = function
   | PDattribute _ -> assert false
   | PDconstructor (name, params, block) ->
+    verify_have_not_return block.pstmt_loc block.pstmt_desc;
+
     let vars, env = env_from_params classes params in
     let block = type_stmt env block in
     Dconstructor (vars, block)
   | PDmethod (typ_opt, name, params, block) ->
+    let typ = get_typ_opt classes typ_opt in
+
+    if typ <> Tvoid then verify_have_return block.pstmt_loc block.pstmt_desc;
+    current_return_type := typ;
+
     let vars, env = env_from_params classes params in
-    let m = make_method name.id (get_typ_opt classes typ_opt) vars ~-1 in
+    let m = make_method name.id typ vars ~-1 in
     let block = type_stmt env block in
     Dmethod (m, block)
 
-let type_decls (id : string) (decls : pdecl list) : decl list =
-  current_class := Hashtbl.find classes id;
-
+let type_decls (decls : pdecl list) : decl list =
   List.fold_left
     (fun acc decl -> match decl with PDattribute _ -> acc | _ -> type_decl decl :: acc)
     [] decls
@@ -257,7 +274,8 @@ let type_decls (id : string) (decls : pdecl list) : decl list =
 (* Typing class *)
 
 let type_class ((id, _parent, decls) : pclass) : tclass =
-  (Hashtbl.find classes id.id, type_decls id.id decls)
+  current_class := Hashtbl.find classes id.id;
+  (Hashtbl.find classes id.id, type_decls decls)
 
 let type_classes (p : pfile) : tfile = List.map type_class p
 
