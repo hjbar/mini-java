@@ -23,10 +23,6 @@ module Env = Map.Make (String)
 
 type typing_env = typ Env.t
 
-(*
-type typing_env = (string, typ) Hashtbl.t
-*)
-
 (* Build-in classes *)
 
 let rec class_Object =
@@ -42,6 +38,10 @@ let class_String =
   ; class_methods = Hashtbl.create 16
   ; class_attributes = Hashtbl.create 16
   }
+
+let type_object = Tclass class_Object
+
+let type_string = Tclass class_String
 
 let init_classes_env () : classes =
   let classes = Hashtbl.create 16 in
@@ -139,7 +139,7 @@ let get_typ_opt (classes : classes) : pexpr_typ option -> typ = function
 let cst_to_typ : constant -> typ = function
   | Cbool _ -> Tboolean
   | Cint _ -> Tint
-  | Cstring _ -> Tclass class_String
+  | Cstring _ -> type_string
 
 (* Conversion of constructions *)
 

@@ -44,19 +44,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       check_type ~loc:loc1 Tboolean e1.expr_type;
       check_type ~loc:loc2 Tboolean e2.expr_type;
       make_expr (Ebinop (op, e1, e2)) Tboolean
-    | Badd ->
-      if e1.expr_type =* Tint && e2.expr_type =* Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
-      else if e1.expr_type =* Tclass class_String && e2.expr_type =* Tclass class_String then
-        make_expr (Ebinop (Badd_s, e1, e2)) (Tclass class_String)
-      else if e1.expr_type =* Tint && e2.expr_type =* Tclass class_String then
-        make_expr
-          (Ebinop (Badd_s, make_expr (Eunop (Ustring_of_int, e1)) (Tclass class_String), e2))
-          (Tclass class_String)
-      else if e1.expr_type =* Tclass class_String && e2.expr_type =* Tint then
-        make_expr
-          (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) (Tclass class_String)))
-          (Tclass class_String)
-      else error ~loc "Invalid_argument for +"
+    | Badd -> type_add ~loc e1 e2
     | Badd_s -> assert false
   end
   | PEunop (op, e) -> begin
@@ -157,20 +145,20 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
       match args with
       | [ expr ] ->
         let typed_e = type_expr env expr in
-        check_type ~loc:expr.pexpr_loc (Tclass class_String) typed_e.expr_type;
+        check_type ~loc:expr.pexpr_loc type_string typed_e.expr_type;
         make_expr (Eprint typed_e) Tvoid
       | _ -> error ~loc:name.loc "print function need exactly one argument"
     end
     | fun_name ->
       let typed_c = type_expr env c in
 
-      if fun_name = "equals" && typed_c.expr_type =* Tclass class_String then begin
+      if fun_name = "equals" && typed_c.expr_type =* type_string then begin
         match args with
         | [ e1 ] ->
-          check_type ~loc:c.pexpr_loc (Tclass class_String) typed_c.expr_type;
+          check_type ~loc:c.pexpr_loc type_string typed_c.expr_type;
 
           let typed_e1 = type_expr env e1 in
-          check_type ~loc:e1.pexpr_loc (Tclass class_String) typed_e1.expr_type;
+          check_type ~loc:e1.pexpr_loc type_string typed_e1.expr_type;
 
           make_expr (Ebinop (Beq, typed_e1, typed_c)) Tboolean
         | _ -> error ~loc:name.loc "equals function need exactly one argument"
@@ -270,7 +258,7 @@ and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list =
 let type_decl : pdecl -> decl = function
   | PDattribute _ -> assert false
   | PDconstructor (name, params, block) ->
-    verify_have_not_return block.pstmt_loc block.pstmt_desc;
+    verify_have_not_return block.pstmt_loc name.id block.pstmt_desc;
 
     let vars, env = env_from_params classes params in
     let block = type_stmt env block |> snd in
@@ -278,7 +266,7 @@ let type_decl : pdecl -> decl = function
   | PDmethod (typ_opt, name, params, block) ->
     let typ = get_typ_opt classes typ_opt in
 
-    if typ <> Tvoid then verify_have_return block.pstmt_loc block.pstmt_desc;
+    if typ <> Tvoid then verify_have_return block.pstmt_loc name.id block.pstmt_desc;
     current_return_type := typ;
 
     let vars, env = env_from_params classes params in

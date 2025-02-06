@@ -6,13 +6,12 @@ open Typing_utils
 (* Init classes for typing  *)
 
 let init_classes (classes : classes) (p : pfile) =
+  (* We expected that Object and String are already in classes *)
   List.iter
     begin
       fun (id, _, _) ->
         let name, loc = (id.id, id.loc) in
 
-        if name = "Object" || name = "String" then
-          error ~loc "This name %s for class is already used for build-in classes" name;
         if Hashtbl.mem classes id.id then error ~loc "The class %s is already defined" name;
 
         Hashtbl.replace classes id.id (init_class id.id)
@@ -60,28 +59,6 @@ let update_classes (classes : classes) (p : pfile) : unit =
 
 (* Init vars and env for typing method & constr *)
 
-(*
-let env_from_params (classes : classes) (params : pparam list) : var list * typing_env =
-  let env = Hashtbl.create 16 in
-
-  let vars =
-    List.map
-      begin
-        fun (typ, id) ->
-          let name, loc = (id.id, id.loc) in
-
-          if Hashtbl.mem env name then error ~loc "The parameter %s is already defined" name;
-
-          let var = make_var name (get_typ classes typ) ~-1 in
-          Hashtbl.replace env var.var_name var.var_type;
-          var
-      end
-      params
-  in
-
-  (vars, env)
-*)
-
 let env_from_params (classes : classes) (params : pparam list) : var list * typing_env =
   let vars, env =
     List.fold_left
@@ -107,7 +84,7 @@ let get_method (name : string) (loc : location) (args : pexpr list) (cls : class
 
   let meth = Hashtbl.find cls.class_methods name in
 
-  if List.(length meth.meth_params <> length args) then error ~loc "incorrect number of arguments";
+  if List.compare_lengths meth.meth_params args <> 0 then error ~loc "incorrect number of arguments";
 
   meth
 
@@ -124,11 +101,11 @@ let rec have_return : pstmt_desc -> bool = function
 
 let have_not_return (s : pstmt_desc) : bool = not @@ have_return s
 
-let verify_have_return (loc : location) (s : pstmt_desc) : unit =
-  if have_not_return s then error ~loc "This method must have a return"
+let verify_have_return (loc : location) (name : string) (s : pstmt_desc) : unit =
+  if have_not_return s then error ~loc "The method %s must have a return" name
 
-let verify_have_not_return (loc : location) (s : pstmt_desc) : unit =
-  if have_return s then error ~loc "This method must not have a return"
+let verify_have_not_return (loc : location) (name : string) (s : pstmt_desc) : unit =
+  if have_return s then error ~loc "The method %s must not have a return" name
 
 (* Type the args of a call *)
 
@@ -142,3 +119,15 @@ let type_call_args type_expr env args params =
         typed_e
     end
     args params
+
+(* Type the binop Add *)
+
+let type_add ~loc e1 e2 =
+  if e1.expr_type =* Tint && e2.expr_type =* Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
+  else if e1.expr_type =* type_string && e2.expr_type =* type_string then
+    make_expr (Ebinop (Badd_s, e1, e2)) type_string
+  else if e1.expr_type =* Tint && e2.expr_type =* type_string then
+    make_expr (Ebinop (Badd_s, make_expr (Eunop (Ustring_of_int, e1)) type_string, e2)) type_string
+  else if e1.expr_type =* type_string && e2.expr_type =* Tint then
+    make_expr (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) type_string)) type_string
+  else error ~loc "Invalid_argument for +"
