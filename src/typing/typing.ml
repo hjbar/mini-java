@@ -161,29 +161,29 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
         make_expr (Eprint typed_e) Tvoid
       | _ -> error ~loc:name.loc "print function need exactly one argument"
     end
-    (* TODO : remplacer ça pour éviter d'avoir à évaluer deux fois .. *)
-    | "equals" when (type_expr env c).expr_type =* Tclass class_String -> begin
-      match args with
-      | [ e1 ] ->
-        let typed_e1 = type_expr env e1 in
-        check_type ~loc:e1.pexpr_loc (Tclass class_String) typed_e1.expr_type;
-
-        let typed_e2 = type_expr env c in
-        check_type ~loc:c.pexpr_loc (Tclass class_String) typed_e2.expr_type;
-
-        make_expr (Ebinop (Beq, typed_e1, typed_e2)) Tboolean
-      | _ -> error ~loc:name.loc "equals function need exactly one argument"
-    end
-    | _ ->
+    | fun_name ->
       let typed_c = type_expr env c in
 
-      let cls = get_class_type typed_c.expr_type in
-      let meth = get_method name.id name.loc args cls in
+      if fun_name = "equals" && typed_c.expr_type =* Tclass class_String then begin
+        match args with
+        | [ e1 ] ->
+          check_type ~loc:c.pexpr_loc (Tclass class_String) typed_c.expr_type;
 
-      (* TODO : utiliser le sous-typage *)
-      let typed_args = type_call_args type_expr env args meth.meth_params in
+          let typed_e1 = type_expr env e1 in
+          check_type ~loc:e1.pexpr_loc (Tclass class_String) typed_e1.expr_type;
 
-      make_expr (Ecall (typed_c, meth, typed_args)) meth.meth_type
+          make_expr (Ebinop (Beq, typed_e1, typed_c)) Tboolean
+        | _ -> error ~loc:name.loc "equals function need exactly one argument"
+      end
+      else begin
+        let cls = get_class_type typed_c.expr_type in
+        let meth = get_method name.id name.loc args cls in
+
+        (* TODO : utiliser le sous-typage *)
+        let typed_args = type_call_args type_expr env args meth.meth_params in
+
+        make_expr (Ecall (typed_c, meth, typed_args)) meth.meth_type
+      end
   end
   | PEcast (typ, e) ->
     let typed_e = type_expr env e in
