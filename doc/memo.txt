@@ -1,14 +1,16 @@
 À faire (+ court terme) :
 
 - Peut-être remplacer la variable globale pour stocker this par le stocker dans la hashtbl
-- Vérfier que le main existe bel et bien (peut-être fait au parsing ?)
-- Regarder si les variables sont bien init quand on les utilise
 - s'occuper des returns (vérifier sans variable globale?) (ne pas faire un pré-check?)
-- s'occuper des scopes (avec les blocks) (remplacer les hashtbl par des maps)
-- Ajouter la méthode equals dans la classe build-in String
 
 
 À faire (+ long terme) :
 
 - Intégrer l'héritage
 - Intégrer le sous-typage
+
+
+À faire (bonus?) :
+
+- Vérfier que le main existe bel et bien (peut-être fait au parsing ?)
+- Regarder si les variables sont bien init quand on les utilise

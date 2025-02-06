@@ -79,8 +79,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     if not @@ Hashtbl.mem classes name then error ~loc "Class %s not exist" name
     else make_expr Ethis (Tclass c)
   | PEnull -> make_expr Enull Tnull
-  | PEident var when Hashtbl.mem env var.id ->
-    let typ = Hashtbl.find env var.id in
+  | PEident var when Env.mem var.id env ->
+    let typ = Env.find var.id env in
     let expr = make_var var.id typ ~-1 in
 
     make_expr (Evar expr) typ
@@ -105,8 +105,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     let attr = get_attribute field.id cls in
 
     make_expr (Eattr (e, attr)) attr.attr_type
-  | PEassign_ident (var, e) when Hashtbl.mem env var.id ->
-    let typ = Hashtbl.find env var.id in
+  | PEassign_ident (var, e) when Env.mem var.id env ->
+    let typ = Env.find var.id env in
 
     (* TODO: utiliser le sous-typage *)
     let typed_e = type_expr env e in
@@ -207,58 +207,63 @@ and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (t
 
 (* Typing stmt *)
 
-let rec type_stmt (env : typing_env) (stmt : pstmt) : stmt =
+let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
   let loc = stmt.pstmt_loc in
 
   match stmt.pstmt_desc with
-  | PSexpr e -> Sexpr (type_expr env e)
-  | PSvar (typ, var, None) when not @@ Hashtbl.mem env var.id ->
+  | PSexpr e -> (env, Sexpr (type_expr env e))
+  | PSvar (typ, var, None) when not @@ Env.mem var.id env ->
     let typ = get_typ classes typ in
-    Hashtbl.replace env var.id typ;
+    let env = Env.add var.id typ env in
 
-    Svar (make_var var.id typ ~-1, make_expr Enull typ)
-  | PSvar (typ, var, Some e) when not @@ Hashtbl.mem env var.id ->
+    (env, Svar (make_var var.id typ ~-1, make_expr Enull typ))
+  | PSvar (typ, var, Some e) when not @@ Env.mem var.id env ->
     let typ = get_typ classes typ in
-    Hashtbl.replace env var.id typ;
+    let env = Env.add var.id typ env in
 
     let typed_e = type_expr env e in
     if typed_e.expr_type <>* Tnull then check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
 
-    Svar (make_var var.id typ ~-1, make_expr typed_e.expr_desc typed_e.expr_type)
+    (env, Svar (make_var var.id typ ~-1, make_expr typed_e.expr_desc typed_e.expr_type))
   | PSvar (_, var, _) -> error ~loc:var.loc "The variable %s is already defined" var.id
   | PSif (e, s1, s2) ->
     let typed_e = type_expr env e in
 
     check_type ~loc:e.pexpr_loc Tboolean typed_e.expr_type;
 
-    let typed_s1 = type_stmt (Hashtbl.copy env) s1 in
-    let typed_s2 = type_stmt (Hashtbl.copy env) s2 in
+    let typed_s1 = type_stmt env s1 |> snd in
+    let typed_s2 = type_stmt env s2 |> snd in
 
-    Sif (typed_e, typed_s1, typed_s2)
+    (env, Sif (typed_e, typed_s1, typed_s2))
   | PSreturn None ->
     check_type ~loc Tvoid !current_return_type;
-    Sreturn None
+    (env, Sreturn None)
   | PSreturn (Some expr) ->
     let expr = type_expr env expr in
     check_type ~loc !current_return_type expr.expr_type;
-    Sreturn (Some expr)
-  | PSblock block -> Sblock (type_stmts env block)
+    (env, Sreturn (Some expr))
+  | PSblock block -> (env, Sblock (type_stmts env block))
   | PSfor (s1, e, s2, s3) ->
-    let env = Hashtbl.copy env in
-
-    let typed_s1 = type_stmt env s1 in
+    let env, typed_s1 = type_stmt env s1 in
 
     let typed_e = type_expr env e in
     check_type ~loc:e.pexpr_loc Tboolean typed_e.expr_type;
 
-    let typed_s2 = type_stmt env s2 in
-    let typed_s3 = type_stmt env s3 in
+    let env, typed_s2 = type_stmt env s2 in
+    let _, typed_s3 = type_stmt env s3 in
 
-    Sfor (typed_s1, typed_e, typed_s2, typed_s3)
+    (env, Sfor (typed_s1, typed_e, typed_s2, typed_s3))
 
 and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list =
-  let env = Hashtbl.copy env in
-  List.map (type_stmt env) stmts
+  stmts
+  |> List.fold_left
+       begin
+         fun (env, acc) stmt ->
+           let env, typed_stmt = type_stmt env stmt in
+           (env, typed_stmt :: acc)
+       end
+       (env, [])
+  |> snd
 
 (* Typing decl *)
 
@@ -268,7 +273,7 @@ let type_decl : pdecl -> decl = function
     verify_have_not_return block.pstmt_loc block.pstmt_desc;
 
     let vars, env = env_from_params classes params in
-    let block = type_stmt env block in
+    let block = type_stmt env block |> snd in
     Dconstructor (vars, block)
   | PDmethod (typ_opt, name, params, block) ->
     let typ = get_typ_opt classes typ_opt in
@@ -278,7 +283,7 @@ let type_decl : pdecl -> decl = function
 
     let vars, env = env_from_params classes params in
     let m = make_method name.id typ vars ~-1 in
-    let block = type_stmt env block in
+    let block = type_stmt env block |> snd in
     Dmethod (m, block)
 
 let type_decls (decls : pdecl list) : decl list =

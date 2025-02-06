@@ -19,7 +19,13 @@ let error ?(loc = dummy_loc) f =
 
 type classes = (string, class_) Hashtbl.t
 
+module Env = Map.Make (String)
+
+type typing_env = typ Env.t
+
+(*
 type typing_env = (string, typ) Hashtbl.t
+*)
 
 (* Build-in classes *)
 
