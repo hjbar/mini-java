@@ -116,6 +116,24 @@ let has_method (id : string) (c : class_) : bool = Hashtbl.mem c.class_methods i
 
 let exist_class (classes : classes) (c : class_) : bool = Hashtbl.mem classes c.class_name
 
+(* Check functions *)
+
+let check_has_attribute ~loc (id : string) (c : class_) : unit =
+  if not @@ has_attribute id c then error ~loc "The Class %s has not attribute %s" c.class_name id
+
+let check_has_method ~loc (id : string) (c : class_) : unit =
+  if not @@ has_method id c then error ~loc "The Class %s has not var %s" c.class_name id
+
+let check_is_class ~loc (t : typ) =
+  if not @@ is_class_type t then error ~loc "We expected an expression of type Class here"
+
+let check_is_class_or_null ~loc (t : typ) =
+  if not (is_class_type t || t =* Tnull) then
+    error ~loc "We have type %s, but Class or Null expected" (typ_to_string t)
+
+let check_exist_class ~loc (classes : classes) (c : class_) : unit =
+  if not @@ exist_class classes c then error ~loc "Class %s not exist" c.class_name
+
 (* Function on  expr *)
 
 let is_expr_false (e : pexpr) : bool =

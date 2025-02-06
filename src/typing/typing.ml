@@ -62,10 +62,10 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
   end
   | PEthis ->
     let c = !current_class in
-    let name = c.class_name in
 
-    if not @@ Hashtbl.mem classes name then error ~loc "Class %s not exist" name
-    else make_expr Ethis (Tclass c)
+    check_exist_class ~loc classes c;
+
+    make_expr Ethis (Tclass c)
   | PEnull -> make_expr Enull Tnull
   | PEident var when Env.mem var.id env ->
     let typ = Env.find var.id env in
@@ -74,8 +74,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Evar expr) typ
   | PEident var (* Not in env *) ->
     let cls = !current_class in
-    if not @@ has_attribute var.id cls then
-      error ~loc:var.loc "The Class %s has not var %s" cls.class_name var.id;
+    check_has_attribute ~loc:var.loc var.id cls;
 
     let typ = (get_attribute var.id cls).attr_type in
     let expr = make_var var.id typ ~-1 in
@@ -83,12 +82,10 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Evar expr) typ
   | PEdot (c, field) ->
     let e = type_expr env c in
-    if not @@ is_class_type e.expr_type then
-      error ~loc:c.pexpr_loc "We expected an expression of type Class at the left of a .";
+    check_is_class ~loc:c.pexpr_loc e.expr_type;
 
     let cls = get_class_type e.expr_type in
-    if not @@ has_attribute field.id cls then
-      error ~loc:field.loc "%s is not an attribute of the Class %s" field.id cls.class_name;
+    check_has_attribute ~loc:field.loc field.id cls;
 
     let attr = get_attribute field.id cls in
 
@@ -104,8 +101,7 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Eassign_var (expr, typed_e)) typ
   | PEassign_ident (var, e) (* Not in env *) ->
     let cls = !current_class in
-    if not @@ has_attribute var.id cls then
-      error ~loc:var.loc "The Class %s has not var %s" cls.class_name var.id;
+    check_has_attribute ~loc:var.loc var.id cls;
 
     let typ = (get_attribute var.id cls).attr_type in
 
@@ -117,12 +113,10 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Eassign_var (expr, typed_e)) typ
   | PEassign_dot (c, field, e) ->
     let e1 = type_expr env c in
-    if not @@ is_class_type e1.expr_type then
-      error ~loc:c.pexpr_loc "We expected an expression of type Class at the left of a .";
+    check_is_class ~loc:c.pexpr_loc e1.expr_type;
 
     let cls = get_class_type e1.expr_type in
-    if not @@ has_attribute field.id cls then
-      error ~loc:field.loc "%s is not an attribute of the Class %s" field.id cls.class_name;
+    check_has_attribute ~loc:field.loc field.id cls;
 
     let attr = get_attribute field.id cls in
 
@@ -139,29 +133,26 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     let typed_args = type_call_args type_expr env args constr.meth_params in
 
     make_expr (Enew (cls, typed_args)) constr.meth_type
-  | PEcall (c, name, args) -> begin
-    match name.id with
-    | "print" when is_system_out c -> begin
-      match args with
-      | [ expr ] ->
-        let typed_e = type_expr env expr in
-        check_type ~loc:expr.pexpr_loc type_string typed_e.expr_type;
-        make_expr (Eprint typed_e) Tvoid
-      | _ -> error ~loc:name.loc "print function need exactly one argument"
+  | PEcall (c, name, args) ->
+    if name.id = "print" && is_system_out c then begin
+      let expr = get_argument ~loc:name.loc name.id args in
+      let typed_e = type_expr env expr in
+
+      check_type ~loc:expr.pexpr_loc type_string typed_e.expr_type;
+
+      make_expr (Eprint typed_e) Tvoid
     end
-    | fun_name ->
+    else begin
       let typed_c = type_expr env c in
 
-      if fun_name = "equals" && typed_c.expr_type =* type_string then begin
-        match args with
-        | [ e1 ] ->
-          check_type ~loc:c.pexpr_loc type_string typed_c.expr_type;
+      if name.id = "equals" && typed_c.expr_type =* type_string then begin
+        let e1 = get_argument ~loc:name.loc name.id args in
+        check_type ~loc:c.pexpr_loc type_string typed_c.expr_type;
 
-          let typed_e1 = type_expr env e1 in
-          check_type ~loc:e1.pexpr_loc type_string typed_e1.expr_type;
+        let typed_e1 = type_expr env e1 in
+        check_type ~loc:e1.pexpr_loc type_string typed_e1.expr_type;
 
-          make_expr (Ebinop (Beq, typed_e1, typed_c)) Tboolean
-        | _ -> error ~loc:name.loc "equals function need exactly one argument"
+        make_expr (Ebinop (Beq, typed_e1, typed_c)) Tboolean
       end
       else begin
         let cls = get_class_type typed_c.expr_type in
@@ -172,24 +163,23 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
 
         make_expr (Ecall (typed_c, meth, typed_args)) meth.meth_type
       end
-  end
+    end
   | PEcast (typ, e) ->
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
     (* TODO: utiliser le sous-typage *)
     check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
 
-    if not @@ is_class_type typ then error ~loc "Type of the cast is not type Class";
+    check_is_class ~loc typ;
     make_expr (Ecast (get_class_type typ, typed_e)) typ
   | PEinstanceof (e, typ) ->
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
-    if is_class_type typ || typ =* Tnull then begin
-      (* TODO: utiliser le sous-typage *)
-      check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
-      make_expr (Einstanceof (typed_e, (get_class_type typ).class_name)) Tboolean
-    end
-    else error ~loc "We have type %s, but Class or Null expected" (typ_to_string typ)
+    check_is_class_or_null ~loc typ;
+
+    (* TODO: utiliser le sous-typage *)
+    check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    make_expr (Einstanceof (typed_e, (get_class_type typ).class_name)) Tboolean
 
 and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (type_expr env) exprs
 

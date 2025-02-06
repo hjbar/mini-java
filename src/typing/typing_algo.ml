@@ -80,7 +80,7 @@ let env_from_params (classes : classes) (params : pparam list) : var list * typi
 (* Verify if the method is correct *)
 
 let get_method (name : string) (loc : location) (args : pexpr list) (cls : class_) : method_ =
-  if not @@ has_method name cls then error ~loc "%s is not a correct method" name;
+  check_has_method ~loc name cls;
 
   let meth = Hashtbl.find cls.class_methods name in
 
@@ -131,3 +131,9 @@ let type_add ~loc e1 e2 =
   else if e1.expr_type =* type_string && e2.expr_type =* Tint then
     make_expr (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) type_string)) type_string
   else error ~loc "Invalid_argument for +"
+
+(* Verify that args have exactly one arg and return it *)
+
+let get_argument ~loc id = function
+  | [ e ] -> e
+  | _ -> error ~loc "%s function need exactly one argument" id
