@@ -155,8 +155,24 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     match name.id with
     | "print" when is_system_out c -> begin
       match args with
-      | [ expr ] -> make_expr (Eprint (type_expr env expr)) Tvoid
+      | [ expr ] ->
+        let typed_e = type_expr env expr in
+        check_type ~loc:expr.pexpr_loc (Tclass class_String) typed_e.expr_type;
+        make_expr (Eprint typed_e) Tvoid
       | _ -> error ~loc:name.loc "print function need exactly one argument"
+    end
+    (* TODO : remplacer ça pour éviter d'avoir à évaluer deux fois .. *)
+    | "equals" when (type_expr env c).expr_type =* Tclass class_String -> begin
+      match args with
+      | [ e1 ] ->
+        let typed_e1 = type_expr env e1 in
+        check_type ~loc:e1.pexpr_loc (Tclass class_String) typed_e1.expr_type;
+
+        let typed_e2 = type_expr env c in
+        check_type ~loc:c.pexpr_loc (Tclass class_String) typed_e2.expr_type;
+
+        make_expr (Ebinop (Beq, typed_e1, typed_e2)) Tboolean
+      | _ -> error ~loc:name.loc "equals function need exactly one argument"
     end
     | _ ->
       let typed_c = type_expr env c in
