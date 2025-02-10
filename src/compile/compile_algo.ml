@@ -1,5 +1,6 @@
 (* Import *)
 
+open Compile_utils
 open X86_64
 
 (* Data *)
@@ -18,10 +19,10 @@ let get_label_data, new_label_data =
 
 (* Printf *)
 
-let compile_printf (string_label : string) : text =
-  pushq !%rbp ++ movq !%rsp !%rbp
+let compile_printf () : text =
+  label label_print_function ++ pushq !%rbp ++ movq !%rsp !%rbp
   ++ andq (imm ~-16) !%rsp
   ++ movq !%rdi !%rsi
-  ++ movq (ilab string_label) !%rdi
+  ++ movq (ilab label_print_data) !%rdi
   ++ movq (imm 0) !%rax
-  ++ call "printf" ++ movq !%rbp !%rsp ++ popq rbp
+  ++ call "printf" ++ movq !%rbp !%rsp ++ popq rbp ++ ret

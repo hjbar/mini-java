@@ -8,7 +8,7 @@ open Compile_algo
 
 (* Data *)
 
-let data_queue : data_queue = Queue.create ()
+let data_queue : data_queue = init_data_queue ()
 
 (* Compile expr *)
 
@@ -19,7 +19,7 @@ let rec compile_expr (e : expr) : text =
     nop
   | Eprint expr ->
     let label = new_label_data () in
-    compile_expr expr ++ compile_printf label
+    compile_expr expr ++ movq (ilab label) !%rdi ++ call label_print_function
   | _ -> failwith "Others expr todo"
 
 (* Compile stmt *)
@@ -68,7 +68,9 @@ let compile_data () : data =
 let file ?debug:(b = false) (p : tfile) : program =
   debug := b;
 
-  let text = globl "main" ++ label "main" ++ call label_main ++ ret ++ compile_classes p in
+  let text =
+    globl "main" ++ label "main" ++ call label_main ++ ret ++ compile_classes p ++ compile_printf ()
+  in
   let data = compile_data () in
 
   { text; data }
