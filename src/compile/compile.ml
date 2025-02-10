@@ -63,14 +63,20 @@ let compile_data () : data =
     end
     nop data_queue
 
+(* Compile build-in function *)
+
+let compile_build_in () = compile_printf ()
+
+let compile_main (p : tfile) =
+  globl "main" ++ label "main" ++ call label_main ++ xorq !%rax !%rax ++ ret ++ compile_classes p
+  ++ compile_build_in ()
+
 (* Main *)
 
 let file ?debug:(b = false) (p : tfile) : program =
   debug := b;
 
-  let text =
-    globl "main" ++ label "main" ++ call label_main ++ ret ++ compile_classes p ++ compile_printf ()
-  in
+  let text = compile_main p in
   let data = compile_data () in
 
   { text; data }

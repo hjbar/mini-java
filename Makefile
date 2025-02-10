@@ -4,13 +4,13 @@ all: clear clean fmt minijava.exe
 test-manual:
 	@echo "./minijava.exe --debug path_to_testfile"
 
-test-compile:
+test-compile: all
 	@cd tests && ./test -3 ../minijava.exe
 
-test-typing:
+test-typing: all
 	@cd tests && ./test -2 ../minijava.exe
 
-test:
+test: all
 	@./minijava.exe --debug test/test.java
 	@gcc -no-pie -g test/test.s -o test/a.out
 	@./test/a.out
