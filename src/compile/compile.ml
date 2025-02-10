@@ -17,7 +17,9 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cstring s as cst) ->
     Queue.push (get_label_data (), cst) data_queue;
     nop
-  | Eprint expr -> compile_expr expr ++ compile_printf (new_label_data ())
+  | Eprint expr ->
+    let label = new_label_data () in
+    compile_expr expr ++ compile_printf label
   | _ -> failwith "Others expr todo"
 
 (* Compile stmt *)

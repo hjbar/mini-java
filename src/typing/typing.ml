@@ -241,7 +241,7 @@ and type_stmts (env : typing_env) (stmts : pstmt list) : stmt list =
            (env, typed_stmt :: acc)
        end
        (env, [])
-  |> snd
+  |> snd |> List.rev
 
 (* Typing decl *)
 
