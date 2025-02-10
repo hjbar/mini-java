@@ -24,5 +24,4 @@ let compile_printf () : text =
   ++ andq (imm ~-16) !%rsp
   ++ movq !%rdi !%rsi
   ++ movq (ilab label_print_data) !%rdi
-  ++ movq (imm 0) !%rax
-  ++ call "printf" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+  ++ xorq !%rax !%rax ++ call "printf" ++ xorq !%rax !%rax ++ movq !%rbp !%rsp ++ popq rbp ++ ret

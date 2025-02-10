@@ -12,7 +12,8 @@ test-typing:
 
 test:
 	@./minijava.exe --debug test/test.java
-	@gcc -no-pie -g test/test.s -o test/a.out && ./test/a.out
+	@gcc -no-pie -g test/test.s -o test/a.out
+	@./test/a.out
 
 minijava.exe:
 	@dune build src/minijava.exe
