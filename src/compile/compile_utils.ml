@@ -23,11 +23,6 @@ let get_label_cons cls cons = Format.sprintf "C_%s_%s" cls.class_name cons.meth_
 
 type data_queue = (string * constant) Queue.t
 
-let init_data_queue () : data_queue =
-  let q = Queue.create () in
-  Queue.push (label_print_data, Cstring "%s") q;
-  q
-
 (* Type *)
 
 let is_type_void = function Tvoid -> true | _ -> false

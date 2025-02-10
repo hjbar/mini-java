@@ -558,6 +558,7 @@ let rec pr_asm fmt = function
 let print_program fmt p =
   fprintf fmt "\t.text\n";
   pr_asm fmt p.text;
+  fprintf fmt "\n";
   fprintf fmt "\t.data\n";
   pr_asm fmt p.data;
   pp_print_flush fmt ()

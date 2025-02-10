@@ -8,7 +8,7 @@ open Compile_algo
 
 (* Data *)
 
-let data_queue : data_queue = init_data_queue ()
+let data_queue : data_queue = Queue.create ()
 
 (* Compile expr *)
 
@@ -19,7 +19,7 @@ let rec compile_expr (e : expr) : text =
     nop
   | Eprint expr ->
     let label = new_label_data () in
-    compile_expr expr ++ movq (ilab label) !%rdi ++ call label_print_function
+    compile_expr expr ++ movq (ilab label) !%rdi ++ addq (imm 8) !%rdi ++ call label_print_function
   | _ -> failwith "Others expr todo"
 
 (* Compile stmt *)
@@ -52,16 +52,17 @@ let compile_classes (p : tfile) =
 (* Compile data *)
 
 let compile_data () : data =
-  Queue.fold
-    begin
-      fun acc (label_name, cst) ->
-        acc ++ label label_name
-        ++
-        match cst with
-        | Cstring s -> string s
-        | _ -> failwith "more cst in match in compile_data TODO"
-    end
-    nop data_queue
+  label label_print_data ++ string "%s"
+  ++ Queue.fold
+       begin
+         fun acc (label_name, cst) ->
+           acc ++ label label_name
+           ++
+           match cst with
+           | Cstring s -> dquad [ 0 ] ++ string s
+           | _ -> failwith "more cst in match in compile_data TODO"
+       end
+       nop data_queue
 
 (* Compile build-in function *)
 

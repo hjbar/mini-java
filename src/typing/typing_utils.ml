@@ -134,11 +134,6 @@ let check_is_class_or_null ~loc (t : typ) =
 let check_exist_class ~loc (classes : classes) (c : class_) : unit =
   if not @@ exist_class classes c then error ~loc "Class %s not exist" c.class_name
 
-(* Function on  expr *)
-
-let is_expr_false (e : pexpr) : bool =
-  match e.pexpr_desc with PEconstant (Cbool false) -> true | _ -> false
-
 (* Conversion of types *)
 
 let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ = function
