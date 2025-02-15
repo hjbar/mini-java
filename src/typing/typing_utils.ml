@@ -17,7 +17,7 @@ let error ?(loc = dummy_loc) f =
 
 (* Env *)
 
-type classes = (string, class_) Hashtbl.t
+type classes = (string, class_ ref) Hashtbl.t
 
 module Env = Map.Make (String)
 
@@ -46,8 +46,8 @@ let type_string = Tclass class_String
 let init_classes_env () : classes =
   let classes = Hashtbl.create 16 in
 
-  Hashtbl.replace classes class_Object.class_name class_Object;
-  Hashtbl.replace classes class_String.class_name class_String;
+  Hashtbl.replace classes class_Object.class_name (ref class_Object);
+  Hashtbl.replace classes class_String.class_name (ref class_String);
 
   classes
 
@@ -79,8 +79,19 @@ let ( =* ) (typ1 : typ) (typ2 : typ) : bool =
 
 let ( <>* ) (typ1 : typ) (typ2 : typ) : bool = not (typ1 =* typ2)
 
+let ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
+  match (typ1, typ2) with
+  | Tclass c1, Tclass c2 ->
+    let rec aux c1 c2 =
+      if c1.class_name = c2.class_name then true
+      else if c2.class_name = "Object" then false
+      else aux c1 c2.class_extends
+    in
+    aux c1 c2
+  | _, _ -> typ1 =* typ2
+
 let check_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
-  if typ1 <>* typ2 then
+  if typ1 <>* typ2 && not (typ1 <=* typ2) then
     error ~loc "Type %s expected, but got %s" (typ_to_string typ1) (typ_to_string typ2)
 
 (* Making some records *)
@@ -142,7 +153,7 @@ let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ
   | PTident s -> begin
     match Hashtbl.find_opt classes s.id with
     | None -> error ~loc "The class %s don't exist" s.id
-    | Some cls -> Tclass cls
+    | Some cls -> Tclass !cls
   end
 
 let get_typ_opt (classes : classes) : pexpr_typ option -> typ = function

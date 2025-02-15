@@ -5,23 +5,67 @@ open Typing_utils
 
 (* Init classes for typing  *)
 
+let print_class c =
+  Printf.printf "Class %s " c.class_name;
+  Printf.printf "Extends %s\n" c.class_extends.class_name
+
+let print_classes (classes : classes) = Hashtbl.iter (fun name c -> print_class !c) classes
+
+let has_cycles (classes : (string, class_ ref) Hashtbl.t) =
+  let visited = Hashtbl.create 16 in
+
+  let rec visit (c : class_) =
+    (* Printf.printf "Visiting %s\n" c.class_name; *)
+    if Hashtbl.mem visited c.class_name then raise (Error (dummy_loc, "Cycle detected"));
+
+    Hashtbl.add visited c.class_name ();
+
+    Printf.printf "extends %s\n" c.class_extends.class_name;
+
+    if c.class_name <> "Object" then visit c.class_extends;
+
+    Hashtbl.remove visited c.class_name
+  in
+
+  Hashtbl.iter (fun _ c -> visit !c) classes
+
+let init_heriarchy (classes : classes) (p : pfile) =
+  List.iter
+    begin
+      fun (id, parent, _) ->
+        let name, loc = (id.id, id.loc) in
+        begin
+          match parent with
+          | None -> ()
+          | Some par ->
+            let par_name = par.id in
+            if not @@ Hashtbl.mem classes par_name then
+              error ~loc "The class %s is not defined" par_name;
+            let par = Hashtbl.find classes par_name in
+            let c = Hashtbl.find classes name in
+            !c.class_extends <- !par
+        end
+    end
+    (List.rev p)
+
 let init_classes (classes : classes) (p : pfile) =
   (* We expected that Object and String are already in classes *)
   List.iter
     begin
-      fun (id, _, _) ->
+      fun (id, par, _) ->
         let name, loc = (id.id, id.loc) in
 
         if Hashtbl.mem classes id.id then error ~loc "The class %s is already defined" name;
 
-        Hashtbl.replace classes id.id (init_class id.id)
+        Hashtbl.replace classes id.id (ref @@ init_class id.id)
     end
-    p
+    (List.rev p);
+  init_heriarchy classes p;
+  has_cycles classes
 
 (* Update class with decls *)
 
 let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
-  (* TODO : extends *)
   List.iter
     begin
       function
@@ -55,7 +99,7 @@ let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
     decls
 
 let update_classes (classes : classes) (p : pfile) : unit =
-  List.iter (fun (id, _parent, decls) -> update_class classes (Hashtbl.find classes id.id) decls) p
+  List.iter (fun (id, _parent, decls) -> update_class classes !(Hashtbl.find classes id.id) decls) p
 
 (* Init vars and env for typing method & constr *)
 

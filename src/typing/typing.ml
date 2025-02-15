@@ -14,8 +14,34 @@ let classes : classes = init_classes_env ()
 
 (* Typing expr *)
 
+let rec print_pexpr_desc (p : pexpr_desc) =
+  match p with
+  | PEconstant c -> Printf.printf "PEconstant \n"
+  | PEbinop (b, e1, e2) -> Printf.printf "PEbinop \n"
+  | PEunop (u, e) -> Printf.printf "PEunop \n"
+  | PEthis -> Printf.printf "PEthis \n"
+  | PEnull -> Printf.printf "PEnull \n"
+  | PEident i -> Printf.printf "PEident \n"
+  | PEdot (e, i) -> Printf.printf "PEdot \n"
+  | PEassign_ident (i, e) -> Printf.printf "PEassign_ident \n"
+  | PEassign_dot (e, i, e2) -> Printf.printf "PEassign_dot \n"
+  | PEnew (i, l) -> Printf.printf "PEnew \n"
+  | PEcall (e, i, l) -> Printf.printf "PEcall \n"
+  | PEcast (t, e) -> Printf.printf "PEcast \n"
+  | PEinstanceof (e, t) -> Printf.printf "PEinstanceof \n"
+
+let rec print_stmt_desc (p : pstmt_desc) =
+  match p with
+  | PSexpr e -> Printf.printf "PSexpr \n"
+  | PSvar (t, i, e) -> Printf.printf "PSvar \n"
+  | PSif (e, s1, s2) -> Printf.printf "PSif \n"
+  | PSreturn e -> Printf.printf "PSreturn \n"
+  | PSblock l -> Printf.printf "PSblock \n"
+  | PSfor (s1, e, s2, s3) -> Printf.printf "PSfor \n"
+
 let rec type_expr (env : typing_env) (expr : pexpr) : expr =
   let loc = expr.pexpr_loc in
+  (* print_pexpr_desc expr.pexpr_desc; *)
 
   match expr.pexpr_desc with
   | PEconstant cst -> make_expr (Econstant cst) (cst_to_typ cst)
@@ -127,12 +153,12 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Eassign_attr (e1, attr, e2)) attr.attr_type
   | PEnew (name, args) ->
     let cls = Hashtbl.find classes name.id in
-    let constr = get_method name.id name.loc args cls in
+    let constr = get_method name.id name.loc args !cls in
 
     (* TODO : utiliser le sous-typage *)
     let typed_args = type_call_args type_expr env args constr.meth_params in
 
-    make_expr (Enew (cls, typed_args)) constr.meth_type
+    make_expr (Enew (!cls, typed_args)) constr.meth_type
   | PEcall (c, name, args) ->
     if name.id = "print" && is_system_out c then begin
       let expr = get_argument ~loc:name.loc name.id args in
@@ -188,6 +214,7 @@ and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (t
 let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
   let loc = stmt.pstmt_loc in
 
+  (* print_stmt_desc stmt.pstmt_desc; *)
   match stmt.pstmt_desc with
   | PSexpr e -> (env, Sexpr (type_expr env e))
   | PSvar (typ, var, None) when not @@ Env.mem var.id env ->
@@ -273,8 +300,8 @@ let type_decls (decls : pdecl list) : decl list =
 (* Typing class *)
 
 let type_class ((id, _parent, decls) : pclass) : tclass =
-  current_class := Hashtbl.find classes id.id;
-  (Hashtbl.find classes id.id, type_decls decls)
+  current_class := !(Hashtbl.find classes id.id);
+  (!(Hashtbl.find classes id.id), type_decls decls)
 
 let type_classes (p : pfile) : tfile = List.map type_class p
 
