@@ -20,8 +20,6 @@ let has_cycles (classes : (string, class_ ref) Hashtbl.t) =
 
     Hashtbl.add visited c.class_name ();
 
-    Printf.printf "extends %s\n" c.class_extends.class_name;
-
     if c.class_name <> "Object" then visit c.class_extends;
 
     Hashtbl.remove visited c.class_name
