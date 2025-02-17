@@ -3,6 +3,7 @@
 open Ast
 open Typing_utils
 open Typing_algo
+open Typing_print
 
 (* Globals of typing *)
 
@@ -13,31 +14,6 @@ let current_return_type = ref Tnull
 let classes : classes = init_classes_env ()
 
 (* Typing expr *)
-
-let rec print_pexpr_desc (p : pexpr_desc) =
-  match p with
-  | PEconstant c -> Printf.printf "PEconstant \n"
-  | PEbinop (b, e1, e2) -> Printf.printf "PEbinop \n"
-  | PEunop (u, e) -> Printf.printf "PEunop \n"
-  | PEthis -> Printf.printf "PEthis \n"
-  | PEnull -> Printf.printf "PEnull \n"
-  | PEident i -> Printf.printf "PEident \n"
-  | PEdot (e, i) -> Printf.printf "PEdot \n"
-  | PEassign_ident (i, e) -> Printf.printf "PEassign_ident \n"
-  | PEassign_dot (e, i, e2) -> Printf.printf "PEassign_dot \n"
-  | PEnew (i, l) -> Printf.printf "PEnew \n"
-  | PEcall (e, i, l) -> Printf.printf "PEcall \n"
-  | PEcast (t, e) -> Printf.printf "PEcast \n"
-  | PEinstanceof (e, t) -> Printf.printf "PEinstanceof \n"
-
-let rec print_stmt_desc (p : pstmt_desc) =
-  match p with
-  | PSexpr e -> Printf.printf "PSexpr \n"
-  | PSvar (t, i, e) -> Printf.printf "PSvar \n"
-  | PSif (e, s1, s2) -> Printf.printf "PSif \n"
-  | PSreturn e -> Printf.printf "PSreturn \n"
-  | PSblock l -> Printf.printf "PSblock \n"
-  | PSfor (s1, e, s2, s3) -> Printf.printf "PSfor \n"
 
 let rec type_expr (env : typing_env) (expr : pexpr) : expr =
   let loc = expr.pexpr_loc in
@@ -54,9 +30,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
 
     match op with
     | Beq | Bneq ->
-      (* TODO: remplacer par le sous-typage *)
       if e1.expr_type <>* Tnull && e2.expr_type <>* Tnull then
-        check_type ~loc e1.expr_type e2.expr_type;
+        check_equiv_type ~loc e1.expr_type e2.expr_type;
       make_expr (Ebinop (op, e1, e2)) Tboolean
     | Blt | Ble | Bgt | Bge ->
       check_type ~loc:loc1 Tint e1.expr_type;
@@ -119,9 +94,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
   | PEassign_ident (var, e) when Env.mem var.id env ->
     let typ = Env.find var.id env in
 
-    (* TODO: utiliser le sous-typage *)
     let typed_e = type_expr env e in
-    if typed_e.expr_type <>* Tnull then check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    if typed_e.expr_type <>* Tnull then check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
     let expr = make_var var.id typ ~-1 in
     make_expr (Eassign_var (expr, typed_e)) typ
@@ -131,9 +105,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
 
     let typ = (get_attribute var.id cls).attr_type in
 
-    (* TODO: utiliser le sous-typage *)
     let typed_e = type_expr env e in
-    if typed_e.expr_type <>* Tnull then check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    if typed_e.expr_type <>* Tnull then check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
     let expr = make_var var.id typ ~-1 in
     make_expr (Eassign_var (expr, typed_e)) typ
@@ -146,19 +119,17 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
 
     let attr = get_attribute field.id cls in
 
-    (* TODO: utiliser le sous-typage *)
     let e2 = type_expr env e in
-    if e2.expr_type <>* Tnull then check_type ~loc:e.pexpr_loc attr.attr_type e2.expr_type;
+    if e2.expr_type <>* Tnull then check_subtype ~loc:e.pexpr_loc e2.expr_type attr.attr_type;
 
     make_expr (Eassign_attr (e1, attr, e2)) attr.attr_type
   | PEnew (name, args) ->
     let cls = Hashtbl.find classes name.id in
-    let constr = get_method name.id name.loc args !cls in
+    let constr = get_method name.id name.loc args cls in
 
-    (* TODO : utiliser le sous-typage *)
     let typed_args = type_call_args type_expr env args constr.meth_params in
 
-    make_expr (Enew (!cls, typed_args)) constr.meth_type
+    make_expr (Enew (cls, typed_args)) constr.meth_type
   | PEcall (c, name, args) ->
     if name.id = "print" && is_system_out c then begin
       let expr = get_argument ~loc:name.loc name.id args in
@@ -184,27 +155,28 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
         let cls = get_class_type typed_c.expr_type in
         let meth = get_method name.id name.loc args cls in
 
-        (* TODO : utiliser le sous-typage *)
         let typed_args = type_call_args type_expr env args meth.meth_params in
 
         make_expr (Ecall (typed_c, meth, typed_args)) meth.meth_type
       end
     end
-  | PEcast (typ, e) ->
+  | PEcast (typ, e) -> begin
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
-    (* TODO: utiliser le sous-typage *)
-    check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    check_equiv_type ~loc:e.pexpr_loc typ typed_e.expr_type;
 
-    check_is_class ~loc typ;
-    make_expr (Ecast (get_class_type typ, typed_e)) typ
+    match typ with
+    | Tclass _ -> make_expr (Ecast (get_class_type typ, typed_e)) typ
+    | _ -> make_expr typed_e.expr_desc typ
+  end
   | PEinstanceof (e, typ) ->
     let typed_e = type_expr env e in
     let typ = get_typ classes typ in
     check_is_class_or_null ~loc typ;
 
-    (* TODO: utiliser le sous-typage *)
-    check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    if typed_e.expr_type <>* Tnull && not (is_class_type typed_e.expr_type) then
+      error ~loc:e.pexpr_loc "We expected an expression of type Class here";
+    check_equiv_type ~loc:e.pexpr_loc typ typed_e.expr_type;
     make_expr (Einstanceof (typed_e, (get_class_type typ).class_name)) Tboolean
 
 and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (type_expr env) exprs
@@ -213,8 +185,8 @@ and type_exprs (env : typing_env) (exprs : pexpr list) : expr list = List.map (t
 
 let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
   let loc = stmt.pstmt_loc in
-
   (* print_stmt_desc stmt.pstmt_desc; *)
+
   match stmt.pstmt_desc with
   | PSexpr e -> (env, Sexpr (type_expr env e))
   | PSvar (typ, var, None) when not @@ Env.mem var.id env ->
@@ -227,7 +199,7 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
     let env = Env.add var.id typ env in
 
     let typed_e = type_expr env e in
-    if typed_e.expr_type <>* Tnull then check_type ~loc:e.pexpr_loc typ typed_e.expr_type;
+    check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
     (env, Svar (make_var var.id typ ~-1, make_expr typed_e.expr_desc typed_e.expr_type))
   | PSvar (_, var, _) -> error ~loc:var.loc "The variable %s is already defined" var.id
@@ -245,7 +217,7 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
     (env, Sreturn None)
   | PSreturn (Some expr) ->
     let expr = type_expr env expr in
-    check_type ~loc !current_return_type expr.expr_type;
+    check_subtype ~loc expr.expr_type !current_return_type;
     (env, Sreturn (Some expr))
   | PSblock block -> (env, Sblock (type_stmts env block))
   | PSfor (s1, e, s2, s3) ->
@@ -276,6 +248,7 @@ let type_decl : pdecl -> decl = function
   | PDattribute _ -> assert false
   | PDconstructor (name, params, block) ->
     verify_have_not_return block.pstmt_loc name.id block.pstmt_desc;
+    current_return_type := Tvoid;
 
     let vars, env = env_from_params classes params in
     let block = type_stmt env block |> snd in
@@ -300,16 +273,16 @@ let type_decls (decls : pdecl list) : decl list =
 (* Typing class *)
 
 let type_class ((id, _parent, decls) : pclass) : tclass =
-  current_class := !(Hashtbl.find classes id.id);
-  (!(Hashtbl.find classes id.id), type_decls decls)
+  current_class := Hashtbl.find classes id.id;
+  (Hashtbl.find classes id.id, type_decls decls)
 
 let type_classes (p : pfile) : tfile = List.map type_class p
 
 (* Main *)
 
 let file ?debug:(b = false) (p : pfile) : tfile =
-  (* TODO : extends todo in update_class *)
   debug := b;
+  let p = List.rev p in
 
   init_classes classes p;
   update_classes classes p;

@@ -5,29 +5,23 @@ open Typing_utils
 
 (* Init classes for typing  *)
 
-let print_class c =
-  Printf.printf "Class %s " c.class_name;
-  Printf.printf "Extends %s\n" c.class_extends.class_name
-
-let print_classes (classes : classes) = Hashtbl.iter (fun name c -> print_class !c) classes
-
-let has_cycles (classes : (string, class_ ref) Hashtbl.t) =
+let has_no_cycles (classes : (string, class_) Hashtbl.t) =
   let visited = Hashtbl.create 16 in
 
   let rec visit (c : class_) =
     (* Printf.printf "Visiting %s\n" c.class_name; *)
     if Hashtbl.mem visited c.class_name then raise (Error (dummy_loc, "Cycle detected"));
 
-    Hashtbl.add visited c.class_name ();
+    Hashtbl.replace visited c.class_name ();
 
     if c.class_name <> "Object" then visit c.class_extends;
 
     Hashtbl.remove visited c.class_name
   in
 
-  Hashtbl.iter (fun _ c -> visit !c) classes
+  Hashtbl.iter (fun _ c -> visit c) classes
 
-let init_heriarchy (classes : classes) (p : pfile) =
+let init_heriarchy (classes : classes) =
   List.iter
     begin
       fun (id, parent, _) ->
@@ -39,12 +33,12 @@ let init_heriarchy (classes : classes) (p : pfile) =
             let par_name = par.id in
             if not @@ Hashtbl.mem classes par_name then
               error ~loc "The class %s is not defined" par_name;
+            if par_name = "String" then error ~loc "The class String cannot be extended";
             let par = Hashtbl.find classes par_name in
             let c = Hashtbl.find classes name in
-            !c.class_extends <- !par
+            c.class_extends <- par
         end
     end
-    (List.rev p)
 
 let init_classes (classes : classes) (p : pfile) =
   (* We expected that Object and String are already in classes *)
@@ -55,11 +49,32 @@ let init_classes (classes : classes) (p : pfile) =
 
         if Hashtbl.mem classes id.id then error ~loc "The class %s is already defined" name;
 
-        Hashtbl.replace classes id.id (ref @@ init_class id.id)
+        Hashtbl.replace classes id.id (init_class id.id)
     end
-    (List.rev p);
+    p;
   init_heriarchy classes p;
-  has_cycles classes
+  has_no_cycles classes
+
+(* Verify if the method is correct *)
+
+let rec check_has_method_opt ~loc (id : string) (c : class_) : method_ option =
+  if c.class_name = "Object" then None
+  else
+    match has_method id c with
+    | false -> check_has_method_opt ~loc id c.class_extends
+    | true -> Hashtbl.find c.class_methods id |> Option.some
+
+let rec check_has_method ~loc (id : string) (c : class_) : method_ =
+  match check_has_method_opt ~loc id c with
+  | None -> error ~loc "The method %s is not defined" id
+  | Some m -> m
+
+let get_method (name : string) (loc : location) (args : pexpr list) (cls : class_) : method_ =
+  let meth = check_has_method ~loc name cls in
+
+  if List.compare_lengths meth.meth_params args <> 0 then error ~loc "incorrect number of arguments";
+
+  meth
 
 (* Update class with decls *)
 
@@ -78,7 +93,8 @@ let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
       | PDconstructor (id, params, block) ->
         let name, loc = (id.id, id.loc) in
 
-        if Hashtbl.mem c.class_methods name then error ~loc "The method %s is already defined" name;
+        if Hashtbl.mem c.class_methods name then
+          error ~loc "The constructor %s is already defined" name;
         if c.class_name <> name then
           error ~loc "The name constructor %s must have the same that the class %s" name
             c.class_name;
@@ -88,16 +104,23 @@ let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
       | PDmethod (typ_opt, id, params, blck) ->
         let name, loc = (id.id, id.loc) in
 
-        if Hashtbl.mem c.class_methods name then
-          error ~loc "The constructor %s is already defined" name;
+        if Hashtbl.mem c.class_methods name then error ~loc "The method %s is already defined" name;
+        let m_type = get_typ_opt classes typ_opt in
+
+        let () =
+          match check_has_method_opt ~loc name c with
+          | None -> ()
+          | Some m' ->
+            if m'.meth_type <> m_type then error ~loc "The method %s has a different type" name
+        in
 
         Hashtbl.replace c.class_methods name
-        @@ make_method name (get_typ_opt classes typ_opt) (pparams_to_vars classes params) ~-1
+        @@ make_method name m_type (pparams_to_vars classes params) ~-1
     end
     decls
 
 let update_classes (classes : classes) (p : pfile) : unit =
-  List.iter (fun (id, _parent, decls) -> update_class classes !(Hashtbl.find classes id.id) decls) p
+  List.iter (fun (id, _parent, decls) -> update_class classes (Hashtbl.find classes id.id) decls) p
 
 (* Init vars and env for typing method & constr *)
 
@@ -117,18 +140,18 @@ let env_from_params (classes : classes) (params : pparam list) : var list * typi
       end
       ([], Env.empty) params
   in
-  (List.rev vars, env)
+  (vars, env)
 
-(* Verify if the method is correct *)
+(*Verify if the class has the attributes*)
 
-let get_method (name : string) (loc : location) (args : pexpr list) (cls : class_) : method_ =
-  check_has_method ~loc name cls;
+let rec get_attribute ?(loc = dummy_loc) (id : string) (c : class_) : attribute =
+  if c.class_name = "Object" then error ~loc "The attribute %s is not defined" id;
 
-  let meth = Hashtbl.find cls.class_methods name in
+  match has_attribute id c with
+  | false -> get_attribute ~loc id c.class_extends
+  | true -> Hashtbl.find c.class_attributes id
 
-  if List.compare_lengths meth.meth_params args <> 0 then error ~loc "incorrect number of arguments";
-
-  meth
+let check_has_attribute ~loc (id : string) (c : class_) : unit = get_attribute ~loc id c |> ignore
 
 (* Verify we have a return ot not *)
 
@@ -149,12 +172,11 @@ let verify_have_not_return (loc : location) (name : string) (s : pstmt_desc) : u
 (* Type the args of a call *)
 
 let type_call_args type_expr env args params =
-  (* TODO : utiliser le sous-typage *)
   List.map2
     begin
       fun e v ->
         let typed_e = type_expr env e in
-        check_type ~loc:e.pexpr_loc v.var_type typed_e.expr_type;
+        check_subtype ~loc:e.pexpr_loc typed_e.expr_type v.var_type;
         typed_e
     end
     args params

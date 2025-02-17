@@ -17,7 +17,7 @@ let error ?(loc = dummy_loc) f =
 
 (* Env *)
 
-type classes = (string, class_ ref) Hashtbl.t
+type classes = (string, class_) Hashtbl.t
 
 module Env = Map.Make (String)
 
@@ -46,8 +46,8 @@ let type_string = Tclass class_String
 let init_classes_env () : classes =
   let classes = Hashtbl.create 16 in
 
-  Hashtbl.replace classes class_Object.class_name (ref class_Object);
-  Hashtbl.replace classes class_String.class_name (ref class_String);
+  Hashtbl.replace classes class_Object.class_name class_Object;
+  Hashtbl.replace classes class_String.class_name class_String;
 
   classes
 
@@ -79,20 +79,35 @@ let ( =* ) (typ1 : typ) (typ2 : typ) : bool =
 
 let ( <>* ) (typ1 : typ) (typ2 : typ) : bool = not (typ1 =* typ2)
 
-let ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
+let rec ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
+  Printf.printf "Comparing %s and %s\n" (typ_to_string typ1) (typ_to_string typ2);
   match (typ1, typ2) with
+  | Tnull, _ -> true
+  | Tint, Tint | Tboolean, Tboolean -> true
+  | Tclass _, Tclass { class_name = "Object" } -> true
   | Tclass c1, Tclass c2 ->
-    let rec aux c1 c2 =
-      if c1.class_name = c2.class_name then true
-      else if c2.class_name = "Object" then false
-      else aux c1 c2.class_extends
-    in
-    aux c1 c2
-  | _, _ -> typ1 =* typ2
+    if c1.class_name = c2.class_name then true
+    else if c1.class_name = "Object" then false
+    else Tclass c1.class_extends <=* typ2
+  | _ -> false
+
+let ( <=>* ) (typ1 : typ) (typ2 : typ) : bool = typ1 <=* typ2 || typ2 <=* typ1
+
+(* Env *)
+
+(* Check functions *)
 
 let check_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
-  if typ1 <>* typ2 && not (typ1 <=* typ2) then
+  if typ1 <>* typ2 then
     error ~loc "Type %s expected, but got %s" (typ_to_string typ1) (typ_to_string typ2)
+
+let check_subtype ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
+  if not (typ1 <=* typ2) then
+    error ~loc "Type %s is not a subtype of %s" (typ_to_string typ1) (typ_to_string typ2)
+
+let check_equiv_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
+  if not (typ1 <=>* typ2) then
+    error ~loc "Type %s is not equivalent to %s" (typ_to_string typ1) (typ_to_string typ2)
 
 (* Making some records *)
 
@@ -121,19 +136,11 @@ let get_class_type : typ -> class_ = function Tclass cls -> cls | _ -> assert fa
 
 let has_attribute (id : string) (c : class_) : bool = Hashtbl.mem c.class_attributes id
 
-let get_attribute (id : string) (c : class_) : attribute = Hashtbl.find c.class_attributes id
-
 let has_method (id : string) (c : class_) : bool = Hashtbl.mem c.class_methods id
 
 let exist_class (classes : classes) (c : class_) : bool = Hashtbl.mem classes c.class_name
 
 (* Check functions *)
-
-let check_has_attribute ~loc (id : string) (c : class_) : unit =
-  if not @@ has_attribute id c then error ~loc "The Class %s has not attribute %s" c.class_name id
-
-let check_has_method ~loc (id : string) (c : class_) : unit =
-  if not @@ has_method id c then error ~loc "The Class %s has not var %s" c.class_name id
 
 let check_is_class ~loc (t : typ) =
   if not @@ is_class_type t then error ~loc "We expected an expression of type Class here"
@@ -153,7 +160,7 @@ let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ
   | PTident s -> begin
     match Hashtbl.find_opt classes s.id with
     | None -> error ~loc "The class %s don't exist" s.id
-    | Some cls -> Tclass !cls
+    | Some cls -> Tclass cls
   end
 
 let get_typ_opt (classes : classes) : pexpr_typ option -> typ = function
