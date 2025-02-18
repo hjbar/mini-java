@@ -80,7 +80,6 @@ let ( =* ) (typ1 : typ) (typ2 : typ) : bool =
 let ( <>* ) (typ1 : typ) (typ2 : typ) : bool = not (typ1 =* typ2)
 
 let rec ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
-  Printf.printf "Comparing %s and %s\n" (typ_to_string typ1) (typ_to_string typ2);
   match (typ1, typ2) with
   | Tnull, _ -> true
   | Tint, Tint | Tboolean, Tboolean -> true
@@ -92,8 +91,6 @@ let rec ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
   | _ -> false
 
 let ( <=>* ) (typ1 : typ) (typ2 : typ) : bool = typ1 <=* typ2 || typ2 <=* typ1
-
-(* Env *)
 
 (* Check functions *)
 

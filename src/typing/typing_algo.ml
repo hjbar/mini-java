@@ -6,38 +6,35 @@ open Typing_utils
 (* Init classes for typing  *)
 
 let has_no_cycles (classes : (string, class_) Hashtbl.t) =
-  let visited = Hashtbl.create 16 in
-
-  let rec visit (c : class_) =
-    (* Printf.printf "Visiting %s\n" c.class_name; *)
-    if Hashtbl.mem visited c.class_name then raise (Error (dummy_loc, "Cycle detected"));
-
-    Hashtbl.replace visited c.class_name ();
-
-    if c.class_name <> "Object" then visit c.class_extends;
-
-    Hashtbl.remove visited c.class_name
+  let rec visit (visited : (string, unit) Hashtbl.t) (c : class_) =
+    match Hashtbl.mem visited c.class_name with
+    | true -> error "Cycle detected"
+    | false ->
+      Hashtbl.replace visited c.class_name ();
+      if c.class_name <> "Object" then visit visited c.class_extends
   in
 
-  Hashtbl.iter (fun _ c -> visit c) classes
+  Hashtbl.iter (fun _ c -> visit (Hashtbl.create 16) c) classes
 
 let init_heriarchy (classes : classes) =
   List.iter
     begin
       fun (id, parent, _) ->
         let name, loc = (id.id, id.loc) in
-        begin
-          match parent with
-          | None -> ()
-          | Some par ->
-            let par_name = par.id in
-            if not @@ Hashtbl.mem classes par_name then
-              error ~loc "The class %s is not defined" par_name;
-            if par_name = "String" then error ~loc "The class String cannot be extended";
-            let par = Hashtbl.find classes par_name in
-            let c = Hashtbl.find classes name in
-            c.class_extends <- par
-        end
+
+        match parent with
+        | None -> ()
+        | Some par ->
+          let par_name = par.id in
+
+          if not @@ Hashtbl.mem classes par_name then
+            error ~loc "The class %s is not defined" par_name;
+          if par_name = "String" then error ~loc "The class String cannot be extended";
+
+          let par = Hashtbl.find classes par_name in
+          let c = Hashtbl.find classes name in
+
+          c.class_extends <- par
     end
 
 let init_classes (classes : classes) (p : pfile) =
@@ -46,12 +43,12 @@ let init_classes (classes : classes) (p : pfile) =
     begin
       fun (id, par, _) ->
         let name, loc = (id.id, id.loc) in
-
         if Hashtbl.mem classes id.id then error ~loc "The class %s is already defined" name;
 
         Hashtbl.replace classes id.id (init_class id.id)
     end
     p;
+
   init_heriarchy classes p;
   has_no_cycles classes
 
@@ -71,9 +68,7 @@ let rec check_has_method ~loc (id : string) (c : class_) : method_ =
 
 let get_method (name : string) (loc : location) (args : pexpr list) (cls : class_) : method_ =
   let meth = check_has_method ~loc name cls in
-
   if List.compare_lengths meth.meth_params args <> 0 then error ~loc "incorrect number of arguments";
-
   meth
 
 (* Update class with decls *)
@@ -130,7 +125,6 @@ let env_from_params (classes : classes) (params : pparam list) : var list * typi
       begin
         fun (vars, env) (typ, id) ->
           let name, loc = (id.id, id.loc) in
-
           if Env.mem name env then error ~loc "The parameter %s is already defined" name;
 
           let var = make_var name (get_typ classes typ) ~-1 in
@@ -140,7 +134,7 @@ let env_from_params (classes : classes) (params : pparam list) : var list * typi
       end
       ([], Env.empty) params
   in
-  (vars, env)
+  (List.rev vars, env)
 
 (*Verify if the class has the attributes*)
 
@@ -180,18 +174,6 @@ let type_call_args type_expr env args params =
         typed_e
     end
     args params
-
-(* Type the binop Add *)
-
-let type_add ~loc e1 e2 =
-  if e1.expr_type =* Tint && e2.expr_type =* Tint then make_expr (Ebinop (Badd, e1, e2)) Tint
-  else if e1.expr_type =* type_string && e2.expr_type =* type_string then
-    make_expr (Ebinop (Badd_s, e1, e2)) type_string
-  else if e1.expr_type =* Tint && e2.expr_type =* type_string then
-    make_expr (Ebinop (Badd_s, make_expr (Eunop (Ustring_of_int, e1)) type_string, e2)) type_string
-  else if e1.expr_type =* type_string && e2.expr_type =* Tint then
-    make_expr (Ebinop (Badd_s, e1, make_expr (Eunop (Ustring_of_int, e2)) type_string)) type_string
-  else error ~loc "Invalid_argument for +"
 
 (* Verify that args have exactly one arg and return it *)
 
