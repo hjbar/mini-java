@@ -14,20 +14,37 @@ let data_queue : data_queue = Queue.create ()
 
 let rec compile_expr (e : expr) : text =
   match e.expr_desc with
+  | Econstant (Cbool b) -> failwith "Econstant Cbool b TODO"
+  | Econstant (Cint n) -> failwith "Econstant Cint n TODO"
   | Econstant (Cstring s as cst) ->
     Queue.push (get_label_data (), cst) data_queue;
     nop
+  | Ebinop (op, e1, e2) -> failwith "Ebinop op e1 e2 TODO"
+  | Eunop (op, e) -> failwith "Eunop op e TODO"
+  | Ethis -> failwith "Ethis TODO"
+  | Enull -> failwith "Enull TODO"
+  | Evar var -> failwith "Evar var TODO"
+  | Eassign_var (var, e) -> failwith "Eassign_var var e TODO"
+  | Eattr (e, attr) -> failwith "Eattr e attr TODO"
+  | Eassign_attr (e1, attr, e2) -> failwith "Eassign_attr e1 attr e2"
+  | Enew (cls, exprs) -> failwith "Enew cls exprs TODO"
+  | Ecall (e, meth, exprs) -> failwith "Ecall e meth exprs TODO"
+  | Ecast (cls, e) -> failwith "Ecast cls e TODO"
+  | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
     let label = new_label_data () in
     compile_expr expr ++ movq (ilab label) !%rdi ++ addq (imm 8) !%rdi ++ call label_print_function
-  | _ -> failwith "Others expr todo"
 
 (* Compile stmt *)
 
 let rec compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr
+  | Svar (var, e) -> failwith "Svar var e TODO"
+  | Sif (e, s1, s2) -> failwith "Sif e s1 s2 TODO"
+  | Sreturn (Some e) -> failwith "Sreturn Some e TODO"
+  | Sreturn None -> failwith "Sreturn None TODO"
   | Sblock stmts -> compile_stmts stmts
-  | _ -> failwith "Others stmt todo"
+  | Sfor (s1, e, s2, s3) -> failwith "Sfor s1 s s2 s3 TODO"
 
 and compile_stmts (stmts : stmt list) =
   List.fold_left (fun acc stmt -> acc ++ compile_stmt stmt) nop stmts
@@ -35,7 +52,7 @@ and compile_stmts (stmts : stmt list) =
 (* Compile decl *)
 
 let compile_decl (cls : class_) : decl -> text = function
-  | Dconstructor (vars, stmt) -> failwith "Dconstructor todo"
+  | Dconstructor (vars, stmt) -> failwith "Dconstructor vars stmt todo"
   | Dmethod (meth, stmt) ->
     get_label_meth cls meth ++ compile_stmt stmt ++ if is_type_void meth.meth_type then ret else nop
 
