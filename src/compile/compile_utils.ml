@@ -26,3 +26,7 @@ type data_queue = (string * constant) Queue.t
 (* Type *)
 
 let is_type_void = function Tvoid -> true | _ -> false
+
+(* Make expr *)
+
+let make_expr expr_desc expr_type = { expr_desc; expr_type }

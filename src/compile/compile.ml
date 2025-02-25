@@ -14,15 +14,54 @@ let data_queue : data_queue = Queue.create ()
 
 let rec compile_expr (e : expr) : text =
   match e.expr_desc with
-  | Econstant (Cbool b) -> failwith "Econstant Cbool b TODO"
-  | Econstant (Cint n) -> failwith "Econstant Cint n TODO"
+  | Econstant (Cbool false) -> pushq @@ imm 0
+  | Econstant (Cbool true) -> pushq @@ imm 1
+  | Econstant (Cint n) -> pushq @@ imm @@ Int32.to_int n
   | Econstant (Cstring s as cst) ->
     Queue.push (get_label_data (), cst) data_queue;
     nop
-  | Ebinop (op, e1, e2) -> failwith "Ebinop op e1 e2 TODO"
-  | Eunop (op, e) -> failwith "Eunop op e TODO"
+  | Ebinop (Band, e1, e2) -> compile_stmt @@ rewrite_and e1 e2
+  | Ebinop (Bor, e1, e2) -> compile_stmt @@ rewrite_or e1 e2
+  | Ebinop (op, e1, e2) -> begin
+    compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
+    ++
+    match op with
+    | Badd -> addq !%r11 !%r10 ++ pushq !%r10
+    | Bsub -> subq !%r11 !%r10 ++ pushq !%r10
+    | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
+    | Bdiv -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rax
+    | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
+    | Beq ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ sete !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Bneq ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setne !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Blt ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setl !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Ble ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setle !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Bgt ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setg !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Bge ->
+      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setge !%al ++ movsbq !%al r10
+      ++ pushq !%r10
+    | Badd_s -> failwith "Ebinop Badd_s e1 e2 TODO"
+    | Band | Bor -> assert false
+  end
+  | Eunop (op, e) -> begin
+    compile_expr e ++ popq r10
+    ++
+    match op with
+    | Uneg -> negq !%r10 ++ pushq !%r10
+    | Unot -> notq !%r10 ++ pushq !%r10
+    | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
+  end
   | Ethis -> failwith "Ethis TODO"
-  | Enull -> failwith "Enull TODO"
+  | Enull -> pushq (imm 0)
   | Evar var -> failwith "Evar var TODO"
   | Eassign_var (var, e) -> failwith "Eassign_var var e TODO"
   | Eattr (e, attr) -> failwith "Eattr e attr TODO"
@@ -37,14 +76,14 @@ let rec compile_expr (e : expr) : text =
 
 (* Compile stmt *)
 
-let rec compile_stmt : stmt -> text = function
+and compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr
   | Svar (var, e) -> failwith "Svar var e TODO"
-  | Sif (e, s1, s2) -> failwith "Sif e s1 s2 TODO"
-  | Sreturn (Some e) -> failwith "Sreturn Some e TODO"
-  | Sreturn None -> failwith "Sreturn None TODO"
+  | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2
+  | Sreturn (Some e) -> compile_expr e ++ ret
+  | Sreturn None -> ret
   | Sblock stmts -> compile_stmts stmts
-  | Sfor (s1, e, s2, s3) -> failwith "Sfor s1 s s2 s3 TODO"
+  | Sfor (s1, e, s2, s3) -> compile_for compile_expr compile_stmt s1 e s2 s3
 
 and compile_stmts (stmts : stmt list) =
   List.fold_left (fun acc stmt -> acc ++ compile_stmt stmt) nop stmts
