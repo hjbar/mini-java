@@ -1,16 +1,13 @@
-À faire (+ court terme) :
+J'ai commencé la compilation.
 
-- Peut-être remplacer la variable globale pour stocker this par le stocker dans la hashtbl
-- s'occuper des returns (vérifier sans variable globale?) (ne pas faire un pré-check?)
+J'ai essayé de faire la compilation des valeurs constantes, les opérations arithmétiques etc... sauf l'add des strings et le string_of_int.
+J'ai essayé aussi de faire les stmts.
+J'ai aussi commencé les variables locales.
+J'ai essayé également la compilation des méthodes.
 
-
-À faire (+ long terme) :
-
-- Intégrer l'héritage
-- Intégrer le sous-typage
-
-
-À faire (bonus?) :
-
-- Vérfier que le main existe bel et bien (peut-être fait au parsing ?)
-- Regarder si les variables sont bien init quand on les utilise
+==> Là tout de suite il faut faire le système pour les classes.
+    C'est-à-dire les 3 étapes :
+      - build the class descriptors
+      - set the offsets of attributes (within objects) and local variables (within the stack)
+      - compile the body of methods and constructors
+    Là dedans j'ai déjà bien commencé de mettre à jour l'offset des variables locales et aussi la compilation des méthodes.

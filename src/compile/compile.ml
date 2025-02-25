@@ -62,12 +62,25 @@ let rec compile_expr (e : expr) : text =
   end
   | Ethis -> failwith "Ethis TODO"
   | Enull -> pushq (imm 0)
-  | Evar var -> failwith "Evar var TODO"
-  | Eassign_var (var, e) -> failwith "Eassign_var var e TODO"
+  | Evar var -> pushq (ind ~ofs:(-var.var_ofs) rbp)
+  | Eassign_var (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
   | Eattr (e, attr) -> failwith "Eattr e attr TODO"
   | Eassign_attr (e1, attr, e2) -> failwith "Eassign_attr e1 attr e2"
   | Enew (cls, exprs) -> failwith "Enew cls exprs TODO"
-  | Ecall (e, meth, exprs) -> failwith "Ecall e meth exprs TODO"
+  | Ecall (e, meth, exprs) ->
+    (* TODO *)
+    let params = nop in
+
+    (* TODO *)
+    let this = nop in
+
+    (* TODO *)
+    let return_adress = nop in
+
+    (* TODO *)
+    let call = nop in
+
+    params ++ this ++ return_adress ++ call
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
@@ -78,7 +91,7 @@ let rec compile_expr (e : expr) : text =
 
 and compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr
-  | Svar (var, e) -> failwith "Svar var e TODO"
+  | Svar (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
   | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2
   | Sreturn (Some e) -> compile_expr e ++ ret
   | Sreturn None -> ret
@@ -93,7 +106,14 @@ and compile_stmts (stmts : stmt list) =
 let compile_decl (cls : class_) : decl -> text = function
   | Dconstructor (vars, stmt) -> failwith "Dconstructor vars stmt todo"
   | Dmethod (meth, stmt) ->
-    get_label_meth cls meth ++ compile_stmt stmt ++ if is_type_void meth.meth_type then ret else nop
+    let meth_label = get_label_meth cls meth in
+    let save_rbp = pushq !%rbp ++ movq !%rsp !%rbp in
+    let local_vars = compile_locals stmt in
+    let body = compile_stmt stmt in
+    let restore_rbp = movq !%rbp !%rsp ++ popq rbp in
+    let return = if is_type_void meth.meth_type then ret else nop in
+
+    meth_label ++ save_rbp ++ local_vars ++ body ++ restore_rbp ++ return
 
 let compile_decls (cls : class_) (decls : decl list) =
   List.fold_left (fun acc decl -> acc ++ compile_decl cls decl) nop decls

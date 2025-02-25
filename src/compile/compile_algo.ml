@@ -77,6 +77,23 @@ let compile_for :
     compile_stmt s1 ++ label label_do ++ compile_expr e ++ jne label_done ++ compile_stmt s2
     ++ compile_stmt s3 ++ jmp label_do ++ label label_done
 
+(* Local variables *)
+
+let compile_locals (stmt : Ast.stmt) : X86_64.text =
+  let cpt = ref 0 in
+
+  (* TODO : Peut-être plus de cas dans loop ? *)
+  let rec loop = function
+    | Svar (var, _) ->
+      cpt := !cpt + 8;
+      var.var_ofs <- !cpt
+    | Sblock stmts -> List.iter loop stmts
+    | _ -> ()
+  in
+
+  loop stmt;
+  subq (imm !cpt) !%rsp
+
 (* Printf *)
 
 let compile_printf () : text =
