@@ -18,6 +18,31 @@ let get_label_data, new_label_data =
 
   (gld, nld)
 
+(* Methods for descriptors *)
+
+let get_methods (class_ : class_) : method_ list =
+  let ofs = ref 8 in
+  let rec aux class_ =
+    match class_.class_name with
+    | "Object" -> []
+    | _ ->
+      aux class_.class_extends
+      |> List.append
+           (Hashtbl.fold
+              (fun _ k acc ->
+                if k.meth_ofs = -1 then (
+                  k.meth_ofs <- !ofs;
+                  ofs := !ofs + 8 )
+                else ofs := k.meth_ofs + 8;
+                k :: acc )
+              class_.class_methods [] )
+  in
+  aux class_
+
+let get_ordered_methods (class_ : class_) : string list =
+  let ord_meth_list = get_methods class_ |> List.sort (fun a b -> compare a.meth_ofs b.meth_ofs) in
+  List.map (fun meth -> "M_" ^ class_.class_name ^ "_" ^ meth.meth_name) ord_meth_list
+
 (* And *)
 
 let rewrite_and e1 e2 =

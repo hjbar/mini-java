@@ -10,6 +10,28 @@ open Compile_algo
 
 let data_queue : data_queue = Queue.create ()
 
+(* Descriptors *)
+
+let descriptors : (string, data) Hashtbl.t = Hashtbl.create 17
+
+(* Label *)
+
+(* Compile descriptors *)
+
+let get_class_descriptor (class_ : class_) : data =
+  let label = get_label_class class_ in
+  let parent_name = "C_" ^ class_.class_extends.class_name in
+  let methods = get_ordered_methods class_ in
+  let methods = List.fold_left (fun acc meth -> acc ++ address [ meth ]) nop methods in
+  label ++ address [ parent_name ] ++ methods
+
+let compile_class_descriptors (classes : tfile) : unit =
+  List.iter
+    (fun (cls, _) ->
+      let descriptor = get_class_descriptor cls in
+      Hashtbl.add descriptors cls.class_name descriptor )
+    classes
+
 (* Compile expr *)
 
 let rec compile_expr (e : expr) : text =
@@ -123,11 +145,12 @@ let compile_decls (cls : class_) (decls : decl list) =
 let compile_class ((cls, decls) : tclass) : text = compile_decls cls decls
 
 let compile_classes (p : tfile) =
+  compile_class_descriptors p;
   List.fold_left (fun acc class_ -> acc ++ compile_class class_) nop p
 
 (* Compile data *)
 
-let compile_data () : data =
+let compile_static_data () : data =
   label label_print_data ++ string "%s"
   ++ Queue.fold
        begin
@@ -139,6 +162,8 @@ let compile_data () : data =
            | _ -> failwith "more cst in match in compile_data TODO"
        end
        nop data_queue
+
+let compile_data () : data = compile_static_data () ++ get_descriptors descriptors
 
 (* Compile build-in function *)
 
