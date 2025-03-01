@@ -86,7 +86,7 @@ let rec compile_expr (e : expr) : text =
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
     let push_obj = pushq !%rax in
     let call_constr =
-      let obj = make_expr (Evar (Typing_utils.make_var "" (Tclass cls) 0)) (Tclass cls) in
+      let obj = make_expr (Evar (make_var "" (Tclass cls) 0)) (Tclass cls) in
       let meth = Hashtbl.find cls.class_methods cls.class_name in
       let expr = make_expr (Ecall (obj, meth, exprs)) Tvoid in
       compile_expr expr
