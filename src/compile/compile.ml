@@ -55,24 +55,12 @@ let rec compile_expr (e : expr) : text =
     | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
     | Bdiv -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rax
     | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
-    | Beq ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ sete !%al ++ movsbq !%al r10
-      ++ pushq !%r10
-    | Bneq ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setne !%al ++ movsbq !%al r10
-      ++ pushq !%r10
-    | Blt ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setl !%al ++ movsbq !%al r10
-      ++ pushq !%r10
-    | Ble ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setle !%al ++ movsbq !%al r10
-      ++ pushq !%r10
-    | Bgt ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setg !%al ++ movsbq !%al r10
-      ++ pushq !%r10
-    | Bge ->
-      movq !%r10 !%rax ++ movq !%r11 !%rbx ++ cmpq !%rbx !%rax ++ setge !%al ++ movsbq !%al r10
-      ++ pushq !%r10
+    | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ pushq !%rax
+    | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ pushq !%rax
+    | Blt -> cmpq !%r11 !%r10 ++ setl !%al ++ pushq !%rax
+    | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ pushq !%rax
+    | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ pushq !%rax
+    | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ pushq !%rax
     | Badd_s -> failwith "Ebinop Badd_s e1 e2 TODO"
     | Band | Bor -> assert false
   end
@@ -81,7 +69,7 @@ let rec compile_expr (e : expr) : text =
     ++
     match op with
     | Uneg -> negq !%r10 ++ pushq !%r10
-    | Unot -> notq !%r10 ++ pushq !%r10
+    | Unot -> xorq (imm 1) !%r10 ++ pushq !%r10
     | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
   end
   | Ethis -> failwith "Ethis TODO"
