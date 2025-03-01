@@ -55,12 +55,12 @@ let rec compile_expr (e : expr) : text =
     | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
     | Bdiv -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rax
     | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
-    | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ pushq !%rax
-    | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ pushq !%rax
-    | Blt -> cmpq !%r11 !%r10 ++ setl !%al ++ pushq !%rax
-    | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ pushq !%rax
-    | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ pushq !%rax
-    | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ pushq !%rax
+    | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Blt -> cmpq !%r11 !%r10 ++ setl !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Badd_s -> failwith "Ebinop Badd_s e1 e2 TODO"
     | Band | Bor -> assert false
   end

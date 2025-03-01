@@ -128,7 +128,7 @@ let env_from_params (classes : classes) (params : pparam list) : var list * typi
           if Env.mem name env then error ~loc "The parameter %s is already defined" name;
 
           let var = make_var name (get_typ classes typ) ~-1 in
-          let env = Env.add var.var_name var.var_type env in
+          let env = Env.add var.var_name var env in
 
           (var :: vars, env)
       end

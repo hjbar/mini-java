@@ -118,9 +118,16 @@ let compile_locals (stmt : Ast.stmt) : X86_64.text =
   (* TODO : Peut-être plus de cas dans loop ? *)
   let rec loop = function
     | Svar (var, _) ->
-      cpt := !cpt + 8;
-      var.var_ofs <- !cpt
+      var.var_ofs <- !cpt;
+      cpt := !cpt + 8
+    | Sif (_, s1, s2) ->
+      loop s1;
+      loop s2
     | Sblock stmts -> List.iter loop stmts
+    | Sfor (s1, _, s2, s3) ->
+      loop s1;
+      loop s2;
+      loop s3
     | _ -> ()
   in
 

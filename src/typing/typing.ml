@@ -84,10 +84,10 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr Ethis (Tclass c)
   | PEnull -> make_expr Enull Tnull
   | PEident var when Env.mem var.id env ->
-    let typ = Env.find var.id env in
-    let expr = make_var var.id typ ~-1 in
+    let var = Env.find var.id env in
+    let typ = var.var_type in
 
-    make_expr (Evar expr) typ
+    make_expr (Evar var) typ
   | PEident var (* Not in env *) ->
     let cls = !current_class in
     check_has_attribute ~loc:var.loc var.id cls;
@@ -106,12 +106,13 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     let attr = get_attribute field.id cls in
     make_expr (Eattr (e, attr)) attr.attr_type
   | PEassign_ident (var, e) when Env.mem var.id env ->
-    let typ = Env.find var.id env in
+    let var = Env.find var.id env in
+
+    let typ = var.var_type in
     let typed_e = type_expr env e in
     check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
-    let expr = make_var var.id typ ~-1 in
-    make_expr (Eassign_var (expr, typed_e)) typ
+    make_expr (Eassign_var (var, typed_e)) typ
   | PEassign_ident (var, e) (* Not in env *) ->
     let cls = !current_class in
     check_has_attribute ~loc:var.loc var.id cls;
@@ -201,17 +202,19 @@ let rec type_stmt (env : typing_env) (stmt : pstmt) : typing_env * stmt =
   | PSexpr e -> (env, Sexpr (type_expr env e))
   | PSvar (typ, var, None) when not @@ Env.mem var.id env ->
     let typ = get_typ classes typ in
-    let env = Env.add var.id typ env in
+    let var = make_var var.id typ ~-1 in
+    let env = Env.add var.var_name var env in
 
-    (env, Svar (make_var var.id typ ~-1, make_expr Enull typ))
+    (env, Svar (var, make_expr Enull typ))
   | PSvar (typ, var, Some e) when not @@ Env.mem var.id env ->
     let typ = get_typ classes typ in
-    let env = Env.add var.id typ env in
+    let var = make_var var.id typ ~-1 in
+    let env = Env.add var.var_name var env in
 
     let typed_e = type_expr env e in
     check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
-    (env, Svar (make_var var.id typ ~-1, make_expr typed_e.expr_desc typed_e.expr_type))
+    (env, Svar (var, make_expr typed_e.expr_desc typed_e.expr_type))
   | PSvar (_, var, _) -> error ~loc:var.loc "The variable %s is already defined" var.id
   | PSif (e, s1, s2) ->
     let typed_e = type_expr env e in
