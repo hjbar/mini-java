@@ -142,3 +142,10 @@ let compile_printf () : text =
   ++ movq !%rdi !%rsi
   ++ movq (ilab label_print_data) !%rdi
   ++ xorq !%rax !%rax ++ call "printf" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Malloc *)
+
+let compile_malloc () : text =
+  label label_malloc_function ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ call "malloc" ++ movq !%rbp !%rsp ++ popq rbp ++ ret

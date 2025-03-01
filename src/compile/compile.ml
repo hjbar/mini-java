@@ -78,7 +78,23 @@ let rec compile_expr (e : expr) : text =
   | Eassign_var (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
   | Eattr (e, attr) -> failwith "Eattr e attr TODO"
   | Eassign_attr (e1, attr, e2) -> failwith "Eassign_attr e1 attr e2"
-  | Enew (cls, exprs) -> failwith "Enew cls exprs TODO"
+  | Enew (cls, exprs) ->
+    (* le résultat est stocké dans RAX *)
+    let malloc =
+      movq (imm @@ Hashtbl.length cls.class_attributes) !%rdi ++ call label_malloc_function
+    in
+
+    let set_descriptor = movq (get_ilab_class cls) (ind rax) in
+
+    let push_obj = pushq !%rax in
+
+    (* TODO *)
+    let call_constr =
+      nop
+      (* compile_expr @@ Ecall( Hashtbl.find cls.class_methods cls.class_name, exprs) *)
+    in
+
+    malloc ++ set_descriptor ++ push_obj ++ call_constr
   | Ecall (e, meth, exprs) ->
     (* TODO *)
     let params = nop in
@@ -92,6 +108,7 @@ let rec compile_expr (e : expr) : text =
     (* TODO *)
     let call = nop in
 
+    failwith "Ecall e meth exprs" |> ignore;
     params ++ this ++ return_adress ++ call
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
@@ -157,7 +174,7 @@ let compile_data () : data = compile_static_data () ++ get_descriptors descripto
 
 (* Compile build-in function *)
 
-let compile_build_in () = compile_printf ()
+let compile_build_in () = compile_printf () ++ compile_malloc ()
 
 let compile_main (p : tfile) =
   globl "main" ++ label "main" ++ call label_main ++ xorq !%rax !%rax ++ ret ++ compile_classes p

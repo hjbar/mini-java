@@ -11,6 +11,8 @@ let debug = ref false
 
 let label_print_function = "M_print_string"
 
+let label_malloc_function = "M_malloc"
+
 let label_print_data = ".D_print_string"
 
 let label_main = "M_Main_main"
@@ -20,6 +22,8 @@ let get_label_meth cls meth = Format.sprintf "M_%s_%s" cls.class_name meth.meth_
 let get_label_cons cls cons = Format.sprintf "C_%s_%s" cls.class_name cons.meth_name |> label
 
 let get_label_class cls = Format.sprintf "C_%s" cls.class_name |> label
+
+let get_ilab_class cls = Format.sprintf "C_%s" cls.class_name |> ilab
 
 (* Data Queue *)
 
