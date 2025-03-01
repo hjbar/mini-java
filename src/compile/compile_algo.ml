@@ -110,6 +110,28 @@ let compile_for :
     compile_stmt s1 ++ label label_do ++ compile_expr e ++ jne label_done ++ compile_stmt s2
     ++ compile_stmt s3 ++ jmp label_do ++ label label_done
 
+(* Attributes *)
+
+let init_attribute_offset (cls : class_) : unit =
+  let offset = ref 8 in
+
+  let rec loop cls =
+    if cls.class_name = "Object" then ()
+    else begin
+      loop cls.class_extends;
+
+      List.iter
+        begin
+          fun attr ->
+            attr.attr_ofs <- !offset;
+            offset := !offset + 8
+        end
+        (cls.class_attributes |> Hashtbl.to_seq_values |> List.of_seq |> List.sort compare)
+    end
+  in
+
+  loop cls
+
 (* Local variables *)
 
 let compile_locals (stmt : Ast.stmt) : X86_64.text =
@@ -133,6 +155,34 @@ let compile_locals (stmt : Ast.stmt) : X86_64.text =
 
   loop stmt;
   subq (imm !cpt) !%rsp
+
+(* Params *)
+
+let set_params_offset (params : var list) : unit =
+  let offset = ref 32 in
+
+  List.iter
+    begin
+      fun param ->
+        param.var_ofs <- !offset;
+        offset := !offset + 8
+    end
+    params
+
+(* Compile method *)
+
+let compile_method (compile_stmt : stmt -> text) (cls : class_) (meth : method_) (stmt : stmt) :
+  text =
+  set_params_offset meth.meth_params;
+
+  let meth_label = get_label_meth cls meth in
+  let save_rbp = pushq !%rbp ++ movq !%rsp !%rbp in
+  let local_vars = compile_locals stmt in
+  let body = compile_stmt stmt in
+  let restore_rbp = movq !%rbp !%rsp ++ popq rbp in
+  let return = ret in
+
+  meth_label ++ save_rbp ++ local_vars ++ body ++ restore_rbp ++ return
 
 (* Printf *)
 

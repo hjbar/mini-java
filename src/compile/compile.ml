@@ -72,15 +72,19 @@ let rec compile_expr (e : expr) : text =
     | Unot -> xorq (imm 1) !%r10 ++ pushq !%r10
     | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
   end
-  | Ethis -> failwith "Ethis TODO"
+  | Ethis -> pushq @@ ind ~ofs:~-24 rbp
   | Enull -> pushq (imm 0)
   | Evar var -> pushq (ind ~ofs:(-var.var_ofs) rbp)
   | Eassign_var (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
-  | Eattr (e, attr) -> failwith "Eattr e attr TODO"
-  | Eassign_attr (e1, attr, e2) -> failwith "Eassign_attr e1 attr e2"
+  | Eattr (e, attr) -> compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10)
+  | Eassign_attr (e1, attr, e2) ->
+    compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
+    ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
   | Enew (cls, exprs) ->
     (* le résultat est stocké dans RAX *)
-    let malloc = movq (imm @@ get_nb_attribute cls) !%rdi ++ call label_malloc_function in
+    init_attribute_offset cls;
+
+    let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
     let push_obj = pushq !%rax in
     let call_constr =
@@ -92,20 +96,11 @@ let rec compile_expr (e : expr) : text =
 
     malloc ++ set_descriptor ++ push_obj ++ call_constr
   | Ecall (e, meth, exprs) ->
-    (* TODO *)
-    let params = nop in
+    let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
+    let this = compile_expr e in
+    let call = call_star (ind ~ofs:meth.meth_ofs rsp) in
 
-    (* TODO *)
-    let this = nop in
-
-    (* TODO *)
-    let return_adress = nop in
-
-    (* TODO *)
-    let call = nop in
-
-    failwith "Ecall e meth exprs" |> ignore;
-    params ++ this ++ return_adress ++ call
+    params ++ this ++ call
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
@@ -129,16 +124,10 @@ and compile_stmts (stmts : stmt list) =
 (* Compile decl *)
 
 let compile_decl (cls : class_) : decl -> text = function
-  | Dconstructor (vars, stmt) -> failwith "Dconstructor vars stmt todo"
-  | Dmethod (meth, stmt) ->
-    let meth_label = get_label_meth cls meth in
-    let save_rbp = pushq !%rbp ++ movq !%rsp !%rbp in
-    let local_vars = compile_locals stmt in
-    let body = compile_stmt stmt in
-    let restore_rbp = movq !%rbp !%rsp ++ popq rbp in
-    let return = if is_type_void meth.meth_type then ret else nop in
-
-    meth_label ++ save_rbp ++ local_vars ++ body ++ restore_rbp ++ return
+  | Dconstructor (vars, stmt) ->
+    let meth = Hashtbl.find cls.class_methods cls.class_name in
+    compile_method compile_stmt cls meth stmt
+  | Dmethod (meth, stmt) -> compile_method compile_stmt cls meth stmt
 
 let compile_decls (cls : class_) (decls : decl list) =
   List.fold_left (fun acc decl -> acc ++ compile_decl cls decl) nop decls
