@@ -53,7 +53,7 @@ let rec compile_expr (e : expr) : text =
     | Badd -> addq !%r11 !%r10 ++ pushq !%r10
     | Bsub -> subq !%r11 !%r10 ++ pushq !%r10
     | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
-    | Bdiv -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rax
+    | Bdiv -> movq !%r10 !%rax ++ cqto ++ idivq !%r11 ++ pushq !%rax
     | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
     | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ movzbq !%al r10 ++ pushq !%r10
