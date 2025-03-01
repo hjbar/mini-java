@@ -20,10 +20,11 @@ let get_label_data, new_label_data =
 
 (* Methods for descriptors *)
 
-let get_methods (class_ : class_) : method_ list =
+let get_methods (class_ : class_) : (string * method_) list =
   let ofs = ref 8 in
   let rec aux class_ =
-    match class_.class_name with
+    let c_name = class_.class_name in
+    match c_name with
     | "Object" -> []
     | _ ->
       aux class_.class_extends
@@ -34,14 +35,16 @@ let get_methods (class_ : class_) : method_ list =
                   k.meth_ofs <- !ofs;
                   ofs := !ofs + 8 )
                 else ofs := k.meth_ofs + 8;
-                k :: acc )
+                (c_name, k) :: acc )
               class_.class_methods [] )
   in
   aux class_
 
 let get_ordered_methods (class_ : class_) : string list =
-  let ord_meth_list = get_methods class_ |> List.sort (fun a b -> compare a.meth_ofs b.meth_ofs) in
-  List.map (fun meth -> "M_" ^ class_.class_name ^ "_" ^ meth.meth_name) ord_meth_list
+  let ord_meth_list =
+    get_methods class_ |> List.sort (fun (_, a) (_, b) -> compare a.meth_ofs b.meth_ofs)
+  in
+  List.map (fun (c_name, meth) -> "M_" ^ c_name ^ "_" ^ meth.meth_name) ord_meth_list
 
 (* And *)
 
