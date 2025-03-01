@@ -37,6 +37,15 @@ let make_expr = Typing_utils.make_expr
 
 let make_var = Typing_utils.make_var
 
+(* Attributes *)
+
+let get_nb_attribute cls =
+  let rec loop cls cpt =
+    if cls.class_name = "Object" then cpt
+    else loop cls.class_extends (cpt + Hashtbl.length cls.class_attributes)
+  in
+  loop cls 0
+
 (* Get descriptors *)
 
 let get_descriptors (descriptors : (string, data) Hashtbl.t) : data =

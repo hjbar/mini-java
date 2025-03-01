@@ -80,9 +80,7 @@ let rec compile_expr (e : expr) : text =
   | Eassign_attr (e1, attr, e2) -> failwith "Eassign_attr e1 attr e2"
   | Enew (cls, exprs) ->
     (* le résultat est stocké dans RAX *)
-    let malloc =
-      movq (imm @@ Hashtbl.length cls.class_attributes) !%rdi ++ call label_malloc_function
-    in
+    let malloc = movq (imm @@ get_nb_attribute cls) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
     let push_obj = pushq !%rax in
     let call_constr =
