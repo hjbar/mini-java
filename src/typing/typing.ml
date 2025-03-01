@@ -297,4 +297,4 @@ let file ?debug:(b = false) (p : pfile) : tfile =
 
   init_classes classes p;
   update_classes classes p;
-  type_classes p
+  (class_Object, []) :: (class_String, []) :: type_classes p

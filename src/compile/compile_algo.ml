@@ -29,14 +29,19 @@ let get_methods (class_ : class_) : (string * method_) list =
     | _ ->
       aux class_.class_extends
       |> List.append
-           (Hashtbl.fold
-              (fun _ k acc ->
-                if k.meth_ofs = -1 then (
-                  k.meth_ofs <- !ofs;
-                  ofs := !ofs + 8 )
-                else ofs := k.meth_ofs + 8;
-                (c_name, k) :: acc )
-              class_.class_methods [] )
+           begin
+             Hashtbl.fold
+               begin
+                 fun _ k acc ->
+                   if k.meth_ofs = -1 then begin
+                     k.meth_ofs <- !ofs;
+                     ofs := !ofs + 8
+                   end
+                   else ofs := k.meth_ofs + 8;
+                   (c_name, k) :: acc
+               end
+               class_.class_methods []
+           end
   in
   aux class_
 

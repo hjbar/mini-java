@@ -27,9 +27,11 @@ let get_class_descriptor (class_ : class_) : data =
 
 let compile_class_descriptors (classes : tfile) : unit =
   List.iter
-    (fun (cls, _) ->
-      let descriptor = get_class_descriptor cls in
-      Hashtbl.add descriptors cls.class_name descriptor )
+    begin
+      fun (cls, _) ->
+        let descriptor = get_class_descriptor cls in
+        Hashtbl.add descriptors cls.class_name descriptor
+    end
     classes
 
 (* Compile expr *)
