@@ -83,15 +83,13 @@ let rec compile_expr (e : expr) : text =
     let malloc =
       movq (imm @@ Hashtbl.length cls.class_attributes) !%rdi ++ call label_malloc_function
     in
-
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
-
     let push_obj = pushq !%rax in
-
-    (* TODO *)
     let call_constr =
-      nop
-      (* compile_expr @@ Ecall( Hashtbl.find cls.class_methods cls.class_name, exprs) *)
+      let obj = make_expr (Evar (Typing_utils.make_var "" (Tclass cls) 0)) (Tclass cls) in
+      let meth = Hashtbl.find cls.class_methods cls.class_name in
+      let expr = make_expr (Ecall (obj, meth, exprs)) Tvoid in
+      compile_expr expr
     in
 
     malloc ++ set_descriptor ++ push_obj ++ call_constr
