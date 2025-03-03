@@ -45,8 +45,8 @@ let rec compile_expr (e : expr) : text =
     let label = new_label_data () in
     Queue.push (label, cst) data_queue;
     nop
-  | Ebinop (Band, e1, e2) -> compile_stmt @@ rewrite_and e1 e2
-  | Ebinop (Bor, e1, e2) -> compile_stmt @@ rewrite_or e1 e2
+  | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_stmt @@ rewrite_and e1 e2
+  | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_stmt @@ rewrite_or e1 e2
   | Ebinop (op, e1, e2) -> begin
     compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
     ++
@@ -56,7 +56,11 @@ let rec compile_expr (e : expr) : text =
     | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
     | Bdiv -> movq !%r10 !%rax ++ cqto ++ idivq !%r11 ++ pushq !%rax
     | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
-    | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Beq ->
+      if e1.expr_type = Tclass class_String || e2.expr_type = Tclass class_String then
+        failwith "Beq String String TODO";
+
+      cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Blt -> cmpq !%r11 !%r10 ++ setl !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ movzbq !%al r10 ++ pushq !%r10
@@ -77,20 +81,21 @@ let rec compile_expr (e : expr) : text =
   | Enull -> pushq (imm 0)
   | Evar var -> debug_text "var" @@ pushq (ind ~ofs:(-var.var_ofs) rbp)
   | Eassign_var (var, e) ->
-    Printf.printf " assign var %s\n" var.var_name;
+    Format.printf " assign var %s\n" var.var_name;
 
     debug_text "assign_var"
-    @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp))
+    @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp) ++ pushq !%r10)
   | Eattr (e, attr) ->
-    Printf.printf " attr %s\n" attr.attr_name;
+    Format.printf " attr %s\n" attr.attr_name;
 
     debug_text "attr" @@ (compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10))
   | Eassign_attr (e1, attr, e2) ->
-    Printf.printf " assign attr %s\n" attr.attr_name;
+    Format.printf " assign attr %s\n" attr.attr_name;
 
     debug_text "assign_attr"
     @@ compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
        ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
+       ++ pushq !%r11
   | Enew (cls, exprs) ->
     (* le résultat est stocké dans RAX *)
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
@@ -126,7 +131,7 @@ let rec compile_expr (e : expr) : text =
 (* Compile stmt *)
 
 and compile_stmt : stmt -> text = function
-  | Sexpr expr -> compile_expr expr
+  | Sexpr expr -> compile_expr expr ++ comment "Je suis CE soffretu :" ++ popq r10
   | Svar (var, e) ->
     debug_text "Svar" @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp))
   | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2

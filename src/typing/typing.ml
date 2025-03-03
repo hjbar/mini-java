@@ -90,12 +90,14 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Evar var) typ
   | PEident var (* Not in env *) ->
     let cls = !current_class in
+
     check_has_attribute ~loc:var.loc var.id cls;
+    let attr = get_attribute var.id cls in
 
     let typ = (get_attribute var.id cls).attr_type in
-    let expr = make_var var.id typ ~-1 in
 
-    make_expr (Evar expr) typ
+    let expr = make_expr Ethis (Tclass cls) in
+    make_expr (Eattr (expr, attr)) typ
   | PEdot (c, field) ->
     let e = type_expr env c in
     check_is_class ~loc:c.pexpr_loc e.expr_type;
@@ -115,14 +117,16 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     make_expr (Eassign_var (var, typed_e)) typ
   | PEassign_ident (var, e) (* Not in env *) ->
     let cls = !current_class in
-    check_has_attribute ~loc:var.loc var.id cls;
 
-    let typ = (get_attribute var.id cls).attr_type in
+    check_has_attribute ~loc:var.loc var.id cls;
+    let attr = get_attribute var.id cls in
+
+    let typ = attr.attr_type in
     let typed_e = type_expr env e in
     check_subtype ~loc:e.pexpr_loc typed_e.expr_type typ;
 
-    let expr = make_var var.id typ ~-1 in
-    make_expr (Eassign_var (expr, typed_e)) typ
+    let expr = make_expr Ethis (Tclass cls) in
+    make_expr (Eassign_attr (expr, attr, typed_e)) typ
   | PEassign_dot (c, field, e) ->
     let e1 = type_expr env c in
     check_is_class ~loc:c.pexpr_loc e1.expr_type;

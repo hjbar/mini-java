@@ -38,6 +38,8 @@ type data_queue = (string * constant) Queue.t
 
 (* Type *)
 
+let class_String = Typing_utils.class_String
+
 let is_type_void = function Tvoid -> true | _ -> false
 
 let make_expr = Typing_utils.make_expr

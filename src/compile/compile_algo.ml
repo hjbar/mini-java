@@ -86,7 +86,7 @@ let compile_if :
     let label_else = Format.sprintf "if_else_%d" !cpt in
     let label_done = Format.sprintf "if_done_%d" !cpt in
 
-    compile_expr e ++ popq r10
+    compile_expr e ++ popq r10 ++ pushq !%r10
     ++ cmpq (imm 0) !%r10
     ++ je label_else ++ compile_stmt s1 ++ jmp label_done ++ label label_else ++ compile_stmt s2
     ++ label label_done
@@ -107,8 +107,9 @@ let compile_for :
     let label_do = Format.sprintf "for_do_%d" !cpt in
     let label_done = Format.sprintf "for_done_%d" !cpt in
 
-    compile_stmt s1 ++ label label_do ++ compile_expr e ++ je label_done ++ compile_stmt s2
-    ++ compile_stmt s3 ++ jmp label_do ++ label label_done
+    compile_stmt s1 ++ label label_do ++ compile_expr e ++ popq r10
+    ++ cmpq (imm 0) !%r10
+    ++ je label_done ++ compile_stmt s3 ++ compile_stmt s2 ++ jmp label_do ++ label label_done
 
 (* Attributes *)
 
