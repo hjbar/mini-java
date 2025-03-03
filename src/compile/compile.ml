@@ -42,11 +42,12 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cbool true) -> pushq @@ imm 1
   | Econstant (Cint n) -> pushq @@ imm @@ Int32.to_int n
   | Econstant (Cstring s as cst) ->
+    (* Pushq string ? *)
     let label = new_label_data () in
     Queue.push (label, cst) data_queue;
     nop
-  | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_stmt @@ rewrite_and e1 e2
-  | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_stmt @@ rewrite_or e1 e2
+  | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_and compile_expr e1 e2
+  | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_or compile_expr e1 e2
   | Ebinop (op, e1, e2) -> begin
     compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
     ++
@@ -78,7 +79,7 @@ let rec compile_expr (e : expr) : text =
     | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
   end
   | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
-  | Enull -> pushq (imm 0)
+  | Enull -> pushq @@ imm 0
   | Evar var -> debug_text "var" @@ pushq (ind ~ofs:(-var.var_ofs) rbp)
   | Eassign_var (var, e) ->
     Format.printf " assign var %s\n" var.var_name;
