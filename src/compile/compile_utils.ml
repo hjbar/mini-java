@@ -7,6 +7,15 @@ open Ast
 
 let debug = ref false
 
+let debug_text case text =
+  if !debug then
+    comment ""
+    ++ comment (" Début " ^ case ^ " :")
+    ++ comment "" ++ text ++ comment ""
+    ++ comment (" Fin " ^ case ^ " :")
+    ++ comment ""
+  else text
+
 (* Label *)
 
 let label_print_function = "M_print_string"
@@ -34,6 +43,14 @@ let is_type_void = function Tvoid -> true | _ -> false
 let make_expr = Typing_utils.make_expr
 
 let make_var = Typing_utils.make_var
+
+(* Return *)
+
+let rec have_return = function
+  | Sreturn _ -> true
+  | Sif (_, s1, s2) -> have_return s1 && have_return s2
+  | Sblock block -> List.exists have_return block
+  | _ -> false
 
 (* Attributes *)
 

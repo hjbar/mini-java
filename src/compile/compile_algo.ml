@@ -107,7 +107,7 @@ let compile_for :
     let label_do = Format.sprintf "for_do_%d" !cpt in
     let label_done = Format.sprintf "for_done_%d" !cpt in
 
-    compile_stmt s1 ++ label label_do ++ compile_expr e ++ jne label_done ++ compile_stmt s2
+    compile_stmt s1 ++ label label_do ++ compile_expr e ++ je label_done ++ compile_stmt s2
     ++ compile_stmt s3 ++ jmp label_do ++ label label_done
 
 (* Attributes *)
@@ -160,8 +160,8 @@ let compile_locals (stmt : Ast.stmt) : X86_64.text =
   (* TODO : Peut-être plus de cas dans loop ? *)
   let rec loop = function
     | Svar (var, _) ->
-      var.var_ofs <- !cpt;
-      cpt := !cpt + 8
+      cpt := !cpt + 8;
+      var.var_ofs <- !cpt
     | Sif (_, s1, s2) ->
       loop s1;
       loop s2
@@ -199,10 +199,11 @@ let compile_method (compile_stmt : stmt -> text) (cls : class_) (meth : method_)
   let save_rbp = pushq !%rbp ++ movq !%rsp !%rbp in
   let local_vars = compile_locals stmt in
   let body = compile_stmt stmt in
-  let restore_rbp = movq !%rbp !%rsp ++ popq rbp in
-  let return = ret in
+  let restore_rbp_and_return =
+    if have_return stmt then nop else movq !%rbp !%rsp ++ popq rbp ++ ret
+  in
 
-  meth_label ++ save_rbp ++ local_vars ++ body ++ restore_rbp ++ return
+  meth_label ++ save_rbp ++ local_vars ++ body ++ restore_rbp_and_return
 
 (* Printf *)
 

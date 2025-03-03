@@ -42,7 +42,8 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cbool true) -> pushq @@ imm 1
   | Econstant (Cint n) -> pushq @@ imm @@ Int32.to_int n
   | Econstant (Cstring s as cst) ->
-    Queue.push (get_label_data (), cst) data_queue;
+    let label = new_label_data () in
+    Queue.push (label, cst) data_queue;
     nop
   | Ebinop (Band, e1, e2) -> compile_stmt @@ rewrite_and e1 e2
   | Ebinop (Bor, e1, e2) -> compile_stmt @@ rewrite_or e1 e2
@@ -72,19 +73,24 @@ let rec compile_expr (e : expr) : text =
     | Unot -> xorq (imm 1) !%r10 ++ pushq !%r10
     | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
   end
-  | Ethis -> pushq @@ ind ~ofs:~-24 rbp
+  | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
   | Enull -> pushq (imm 0)
-  | Evar var -> pushq (ind ~ofs:(-var.var_ofs) rbp)
+  | Evar var -> debug_text "var" @@ pushq (ind ~ofs:(-var.var_ofs) rbp)
   | Eassign_var (var, e) ->
     Printf.printf " assign var %s\n" var.var_name;
-    compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
+
+    debug_text "assign_var"
+    @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp))
   | Eattr (e, attr) ->
     Printf.printf " attr %s\n" attr.attr_name;
-    compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10)
+
+    debug_text "attr" @@ (compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10))
   | Eassign_attr (e1, attr, e2) ->
     Printf.printf " assign attr %s\n" attr.attr_name;
-    compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
-    ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
+
+    debug_text "assign_attr"
+    @@ compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
+       ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
   | Enew (cls, exprs) ->
     (* le résultat est stocké dans RAX *)
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
@@ -99,27 +105,34 @@ let rec compile_expr (e : expr) : text =
       let expr = make_expr (Ecall (obj, meth, exprs)) Tvoid in
       compile_expr expr *)
 
-    malloc ++ set_descriptor ++ push_obj ++ call_constr
+    debug_text "new" @@ (malloc ++ set_descriptor ++ push_obj ++ call_constr)
   | Ecall (e, meth, exprs) ->
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let this = compile_expr e in
     let call = call_star (ind ~ofs:meth.meth_ofs rsp) in
 
-    params ++ this ++ call
+    debug_text "call" @@ (params ++ this ++ call)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
-    let label = new_label_data () in
-    compile_expr expr ++ movq (ilab label) !%rdi ++ addq (imm 8) !%rdi ++ call label_print_function
+    let compiled_expr = compile_expr expr in
+
+    debug_text "print"
+    @@ compiled_expr
+       ++ movq (ilab @@ get_label_data ()) !%rdi
+       ++ addq (imm 8) !%rdi
+       ++ call label_print_function
 
 (* Compile stmt *)
 
 and compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr
-  | Svar (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
+  | Svar (var, e) ->
+    debug_text "Svar" @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp))
   | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2
-  | Sreturn (Some e) -> compile_expr e ++ ret
-  | Sreturn None -> ret
+  | Sreturn (Some e) ->
+    debug_text "return" @@ (movq !%rbp !%rsp ++ popq rbp ++ compile_expr e ++ ret)
+  | Sreturn None -> debug_text "return" @@ (movq !%rbp !%rsp ++ popq rbp ++ ret)
   | Sblock stmts -> compile_stmts stmts
   | Sfor (s1, e, s2, s3) -> compile_for compile_expr compile_stmt s1 e s2 s3
 
