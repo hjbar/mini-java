@@ -123,8 +123,11 @@ let init_attribute_offset (cls : class_) : unit =
       List.iter
         begin
           fun attr ->
-            attr.attr_ofs <- !offset;
-            offset := !offset + 8
+            if attr.attr_ofs = -1 then begin
+              attr.attr_ofs <- !offset;
+              offset := !offset + 8
+            end
+            else offset := attr.attr_ofs + 8
         end
         (cls.class_attributes |> Hashtbl.to_seq_values |> List.of_seq |> List.sort compare)
     end
@@ -132,6 +135,23 @@ let init_attribute_offset (cls : class_) : unit =
 
   loop cls
 
+let print_attr_offset cls =
+  Printf.printf "printing attributes offset for class %s\n" cls.class_name;
+  let rec loop cls =
+    if cls.class_name = "Object" then ()
+    else begin
+      loop cls.class_extends;
+      Printf.printf "length of attributes for class %s : %d\n" cls.class_name
+        (Hashtbl.length cls.class_attributes);
+      Hashtbl.iter
+        begin
+          fun _ attr -> Printf.printf "attr %s : %d\n" attr.attr_name attr.attr_ofs
+        end
+        cls.class_attributes;
+      Printf.printf "fin\n"
+    end
+  in
+  loop cls
 (* Local variables *)
 
 let compile_locals (stmt : Ast.stmt) : X86_64.text =

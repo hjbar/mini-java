@@ -75,24 +75,29 @@ let rec compile_expr (e : expr) : text =
   | Ethis -> pushq @@ ind ~ofs:~-24 rbp
   | Enull -> pushq (imm 0)
   | Evar var -> pushq (ind ~ofs:(-var.var_ofs) rbp)
-  | Eassign_var (var, e) -> compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
-  | Eattr (e, attr) -> compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10)
+  | Eassign_var (var, e) ->
+    Printf.printf " assign var %s\n" var.var_name;
+    compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp)
+  | Eattr (e, attr) ->
+    Printf.printf " attr %s\n" attr.attr_name;
+    compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10)
   | Eassign_attr (e1, attr, e2) ->
+    Printf.printf " assign attr %s\n" attr.attr_name;
     compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
     ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
   | Enew (cls, exprs) ->
     (* le résultat est stocké dans RAX *)
-    init_attribute_offset cls;
-
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
     let push_obj = pushq !%rax in
     let call_constr =
+      movq (ind rax) !%rcx ++ movq (ind ~ofs:8 rcx) !%rdx ++ movq !%rax !%rdi ++ call_star !%rdx
+    in
+    (* let call_constr =
       let obj = make_expr (Evar (make_var "" (Tclass cls) 0)) (Tclass cls) in
       let meth = Hashtbl.find cls.class_methods cls.class_name in
       let expr = make_expr (Ecall (obj, meth, exprs)) Tvoid in
-      compile_expr expr
-    in
+      compile_expr expr *)
 
     malloc ++ set_descriptor ++ push_obj ++ call_constr
   | Ecall (e, meth, exprs) ->
@@ -134,7 +139,9 @@ let compile_decls (cls : class_) (decls : decl list) =
 
 (* Compile class *)
 
-let compile_class ((cls, decls) : tclass) : text = compile_decls cls decls
+let compile_class ((cls, decls) : tclass) : text =
+  init_attribute_offset cls;
+  compile_decls cls decls
 
 let compile_classes (p : tfile) =
   compile_class_descriptors p;
