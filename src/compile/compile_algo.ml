@@ -4,20 +4,6 @@ open Compile_utils
 open Ast
 open X86_64
 
-(* Data *)
-
-let get_label_data, new_label_data =
-  let cpt = ref ~-1 in
-
-  let gld () = Format.sprintf ".D%d" !cpt in
-
-  let nld () =
-    incr cpt;
-    Format.sprintf ".D%d" !cpt
-  in
-
-  (gld, nld)
-
 (* Methods for descriptors *)
 
 let get_methods (class_ : class_) : (string * method_) list =
@@ -239,3 +225,14 @@ let compile_malloc () : text =
   label label_malloc_function ++ pushq !%rbp ++ movq !%rsp !%rbp
   ++ andq (imm ~-16) !%rsp
   ++ call "malloc" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Strcmp *)
+
+let compile_strcmp () : text =
+  let label = label label_strcmp_function in
+  let push_alig = pushq !%rbp ++ movq !%rsp !%rbp ++ andq (imm ~-16) !%rsp in
+  let calc = call "strcmp" ++ cmpl (imm 0) !%eax ++ sete !%al ++ movzbq !%al rax in
+  let pop_alig = movq !%rbp !%rsp ++ popq rbp in
+  let ret = ret in
+
+  label ++ push_alig ++ calc ++ pop_alig ++ ret

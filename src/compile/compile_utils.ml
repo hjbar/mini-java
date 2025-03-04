@@ -22,6 +22,8 @@ let label_print_function = "M_print_string"
 
 let label_malloc_function = "M_malloc"
 
+let label_strcmp_function = "M_strcmp"
+
 let label_print_data = ".D_print_string"
 
 let label_main = "M_Main_main"
@@ -40,9 +42,10 @@ type data_queue = (string * string) Queue.t
 
 (* Type *)
 
-let class_String = Typing_utils.class_String
-
 let is_type_void = function Tvoid -> true | _ -> false
+
+let is_type_string e =
+  match e.expr_type with Tclass cls when cls.class_name = "String" -> true | _ -> false
 
 let make_expr = Typing_utils.make_expr
 

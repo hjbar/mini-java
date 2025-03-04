@@ -43,9 +43,11 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cstring s) -> debug_text "String" @@ compile_string s data_queue
   | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_and compile_expr e1 e2
   | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_or compile_expr e1 e2
-  | Ebinop (Beq, e1, e2)
-    when e1.expr_type = Tclass class_String && e2.expr_type = Tclass class_String ->
-    failwith "Ebinop Beq (e1 : String) (e2 : String) TODO"
+  | Ebinop (Beq, e1, e2) when is_type_string e1 && is_type_string e2 ->
+    compile_expr e1 ++ compile_expr e2 ++ popq rsi ++ popq rdi
+    ++ addq (imm 8) !%rsi
+    ++ addq (imm 8) !%rdi
+    ++ call label_strcmp_function ++ pushq !%rax
   | Ebinop (op, e1, e2) -> begin
     compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
     ++
@@ -124,9 +126,7 @@ let rec compile_expr (e : expr) : text =
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
-    compile_expr expr ++ popq r10 ++ movq !%r10 !%rdi
-    ++ addq (imm 8) !%rdi
-    ++ call label_print_function ++ pushq !%rax
+    compile_expr expr ++ popq rdi ++ addq (imm 8) !%rdi ++ call label_print_function ++ pushq !%rax
 
 (* Compile stmt *)
 
@@ -178,7 +178,7 @@ let compile_data () : data = compile_static_data () ++ get_descriptors descripto
 
 (* Compile build-in function *)
 
-let compile_build_in () = compile_printf () ++ compile_malloc ()
+let compile_build_in () = compile_printf () ++ compile_malloc () ++ compile_strcmp ()
 
 let compile_main (p : tfile) =
   globl "main" ++ label "main" ++ call label_main ++ xorq !%rax !%rax ++ ret ++ compile_classes p
