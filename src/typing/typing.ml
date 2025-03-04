@@ -268,7 +268,9 @@ let type_decl : pdecl -> decl = function
     verify_have_not_return block.pstmt_loc name.id block.pstmt_desc;
     current_return_type := Tvoid;
 
-    let vars, env = env_from_params classes params in
+    let vars, env =
+      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params
+    in
     let block = type_stmt env block |> snd in
     Dconstructor (vars, block)
   | PDmethod (typ_opt, name, params, block) ->
@@ -277,7 +279,9 @@ let type_decl : pdecl -> decl = function
     if typ <> Tvoid then verify_have_return block.pstmt_loc name.id block.pstmt_desc;
     current_return_type := typ;
 
-    let vars, env = env_from_params classes params in
+    let vars, env =
+      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params
+    in
     let m = make_method name.id typ vars ~-1 in
     let block = type_stmt env block |> snd in
     Dmethod (m, block)

@@ -93,7 +93,6 @@ let rec compile_expr (e : expr) : text =
        ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
        ++ pushq !%r11
   | Enew (cls, exprs) ->
-    (* le résultat est stocké dans RAX *)
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
 
@@ -107,8 +106,9 @@ let rec compile_expr (e : expr) : text =
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let this = compile_expr e in
     let call = call_star (ind ~ofs:meth.meth_ofs rsp) in
+    let ret_val = pushq !%rax in
 
-    debug_text "call" (params ++ this ++ call)
+    debug_text "call" (params ++ this ++ call ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->

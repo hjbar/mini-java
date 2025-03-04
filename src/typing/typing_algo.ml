@@ -119,17 +119,15 @@ let update_classes (classes : classes) (p : pfile) : unit =
 
 (* Init vars and env for typing method & constr *)
 
-let env_from_params (classes : classes) (params : pparam list) : var list * typing_env =
+let env_from_params (classes : classes) (params : var list) : var list * typing_env =
   let vars, env =
     List.fold_left
       begin
-        fun (vars, env) (typ, id) ->
-          let name, loc = (id.id, id.loc) in
-          if Env.mem name env then error ~loc "The parameter %s is already defined" name;
+        fun (vars, env) var ->
+          let name = var.var_name in
+          if Env.mem name env then error "The parameter %s is already defined" name;
 
-          let var = make_var name (get_typ classes typ) ~-1 in
           let env = Env.add var.var_name var env in
-
           (var :: vars, env)
       end
       ([], Env.empty) params
