@@ -5,17 +5,13 @@ open Ast
 open Compile_utils
 open Compile_algo
 
-(* TEMPORAIRE *)
-
-let in_print = ref false
-
 (* Data *)
 
 let data_queue : data_queue = Queue.create ()
 
 (* Descriptors *)
 
-let descriptors : (string, data) Hashtbl.t = Hashtbl.create 17
+let descriptors : (string, data) Hashtbl.t = Hashtbl.create 16
 
 (* Label *)
 
@@ -44,13 +40,7 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cbool false) -> pushq @@ imm 0
   | Econstant (Cbool true) -> pushq @@ imm 1
   | Econstant (Cint n) -> pushq @@ imm @@ Int32.to_int n
-  | Econstant (Cstring s as cst) ->
-    (* Pushq string ? *)
-    if not !in_print then failwith "String in stack : TODO";
-
-    let label = new_label_data () in
-    Queue.push (label, cst) data_queue;
-    nop
+  | Econstant (Cstring s) -> debug_text "String" @@ compile_string s data_queue
   | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_and compile_expr e1 e2
   | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_or compile_expr e1 e2
   | Ebinop (op, e1, e2) -> begin
@@ -83,13 +73,20 @@ let rec compile_expr (e : expr) : text =
   | Enull -> pushq @@ imm 0
   | Evar var ->
     Format.printf "accesing var %s at offset %d\n" var.var_name var.var_ofs;
+
     debug_text "var" @@ pushq (ind ~ofs:var.var_ofs rbp)
   | Eassign_var (var, e) ->
+    Format.printf "assign var %s at offset %d\n" var.var_name var.var_ofs;
+
     debug_text "assign_var"
       (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:var.var_ofs rbp) ++ pushq !%r10)
   | Eattr (e, attr) ->
+    Format.printf "accesing attr %s at offset %d\n" attr.attr_name attr.attr_ofs;
+
     debug_text "attr" (compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10))
   | Eassign_attr (e1, attr, e2) ->
+    Format.printf "assign attr %s at offset %d\n" attr.attr_name attr.attr_ofs;
+
     debug_text "assign_attr"
     @@ compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
        ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
@@ -97,41 +94,36 @@ let rec compile_expr (e : expr) : text =
   | Enew (cls, exprs) ->
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
+    let save_obj = movq !%rax !%r15 in
 
-    let push_obj = pushq !%rax in
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
+
+    let push_obj = pushq !%r15 in
 
     let call_constr = call @@ get_name_constr cls in
     let depile = addq (imm (8 * (List.length exprs + 1))) !%rsp in
 
     debug_text "new"
-      (malloc ++ set_descriptor ++ params ++ push_obj ++ call_constr ++ depile ++ push_obj)
+      ( malloc ++ set_descriptor ++ save_obj ++ params ++ push_obj ++ call_constr ++ depile
+      ++ push_obj )
   | Ecall (e, meth, exprs) ->
-    let get_class = movq (ind rsp) !%r10 in
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
+
     let this = compile_expr e in
+    let get_class = movq (ind rsp) !%r10 in
+
     let call = movq (ind r10) !%r11 ++ call_star (ind ~ofs:meth.meth_ofs r11) in
     let depile = addq (imm (8 * (List.length exprs + 1))) !%rsp in
+
     let ret_val = pushq !%rax in
 
     debug_text "call" (params ++ this ++ get_class ++ call ++ depile ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
-    in_print := true;
-
-    let compiled_expr = compile_expr expr in
-
-    let text =
-      debug_text "print"
-      @@ compiled_expr
-         ++ movq (ilab @@ get_label_data ()) !%rdi
-         ++ addq (imm 8) !%rdi
-         ++ call label_print_function ++ pushq !%rax
-    in
-
-    in_print := false;
-    text
+    compile_expr expr ++ popq r10 ++ movq !%r10 !%rdi
+    ++ addq (imm 8) !%rdi
+    ++ call label_print_function ++ pushq !%rax
 
 (* Compile stmt *)
 
@@ -176,14 +168,7 @@ let compile_classes (p : tfile) =
 let compile_static_data () : data =
   label label_print_data ++ string "%s"
   ++ Queue.fold
-       begin
-         fun acc (label_name, cst) ->
-           acc ++ label label_name
-           ++
-           match cst with
-           | Cstring s -> dquad [ 0 ] ++ string s
-           | _ -> failwith "more cst in match in compile_data TODO"
-       end
+       (fun acc (label_name, str) -> acc ++ label label_name ++ dquad [ 0 ] ++ string str)
        nop data_queue
 
 let compile_data () : data = compile_static_data () ++ get_descriptors descriptors

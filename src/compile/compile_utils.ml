@@ -36,7 +36,7 @@ let get_ilab_class cls = Format.sprintf "C_%s" cls.class_name |> ilab
 
 (* Data Queue *)
 
-type data_queue = (string * constant) Queue.t
+type data_queue = (string * string) Queue.t
 
 (* Type *)
 

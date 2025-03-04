@@ -51,6 +51,17 @@ let get_ordered_methods (class_ : class_) : string list =
   in
   List.map (fun (c_name, meth) -> "M_" ^ c_name ^ "_" ^ meth.meth_name) ord_meth_list
 
+(* String *)
+
+let compile_string =
+  let cpt = ref ~-1 in
+  fun (string : string) (queue : data_queue) ->
+    incr cpt;
+    let label = Format.sprintf ".D%d" !cpt in
+
+    Queue.push (label, string) queue;
+    pushq (ilab label)
+
 (* And *)
 
 let compile_and : (Ast.expr -> X86_64.text) -> Ast.expr -> Ast.expr -> X86_64.text =
