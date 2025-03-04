@@ -96,19 +96,20 @@ let rec compile_expr (e : expr) : text =
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
 
-    let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let push_obj = pushq !%rax in
+    let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
 
     let call_constr = call @@ get_name_constr cls in
 
     debug_text "new" (malloc ++ set_descriptor ++ params ++ push_obj ++ call_constr)
   | Ecall (e, meth, exprs) ->
+    let get_class = pushq (ind rsp) ++ popq r10 in
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let this = compile_expr e in
-    let call = call_star (ind ~ofs:meth.meth_ofs rsp) in
+    let call = movq (ind r10) !%r11 ++ call_star (ind ~ofs:meth.meth_ofs r11) in
     let ret_val = pushq !%rax in
 
-    debug_text "call" (params ++ this ++ call ++ ret_val)
+    debug_text "call" (this ++ get_class ++ params ++ call ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
@@ -136,7 +137,7 @@ and compile_stmt : stmt -> text = function
   | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2
   | Sreturn (Some e) ->
     debug_text "return"
-      (movq !%rbp !%rsp ++ popq rbp ++ compile_expr e ++ popq r10 ++ movq !%r10 !%rax ++ ret)
+      (compile_expr e ++ popq r10 ++ movq !%r10 !%rax ++ movq !%rbp !%rsp ++ popq rbp ++ ret)
   | Sreturn None -> debug_text "return" (movq !%rbp !%rsp ++ popq rbp ++ ret)
   | Sblock stmts -> compile_stmts stmts
   | Sfor (s1, e, s2, s3) -> compile_for compile_expr compile_stmt s1 e s2 s3
