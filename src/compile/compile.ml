@@ -43,6 +43,9 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cstring s) -> debug_text "String" @@ compile_string s data_queue
   | Ebinop (Band, e1, e2) -> debug_text "And" @@ compile_and compile_expr e1 e2
   | Ebinop (Bor, e1, e2) -> debug_text "Or" @@ compile_or compile_expr e1 e2
+  | Ebinop (Beq, e1, e2)
+    when e1.expr_type = Tclass class_String && e2.expr_type = Tclass class_String ->
+    failwith "Ebinop Beq (e1 : String) (e2 : String) TODO"
   | Ebinop (op, e1, e2) -> begin
     compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
     ++
