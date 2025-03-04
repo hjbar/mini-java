@@ -157,16 +157,16 @@ let print_attr_offset cls =
     end
   in
   loop cls
+
 (* Local variables *)
 
 let compile_locals (stmt : Ast.stmt) : X86_64.text =
   let cpt = ref 0 in
 
-  (* TODO : Peut-être plus de cas dans loop ? *)
   let rec loop = function
     | Svar (var, _) ->
       cpt := !cpt + 8;
-      var.var_ofs <- !cpt
+      var.var_ofs <- - !cpt
     | Sif (_, s1, s2) ->
       loop s1;
       loop s2
@@ -184,7 +184,7 @@ let compile_locals (stmt : Ast.stmt) : X86_64.text =
 (* Params *)
 
 let set_params_offset (params : var list) : unit =
-  let offset = ref 32 in
+  let offset = ref 24 in
 
   List.iter
     begin

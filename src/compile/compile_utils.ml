@@ -28,6 +28,8 @@ let label_main = "M_Main_main"
 
 let get_label_meth cls meth = Format.sprintf "M_%s_%s" cls.class_name meth.meth_name |> label
 
+let get_name_constr cls = Format.sprintf "M_%s_%s" cls.class_name cls.class_name
+
 let get_label_class cls = Format.sprintf "C_%s" cls.class_name |> label
 
 let get_ilab_class cls = Format.sprintf "C_%s" cls.class_name |> ilab

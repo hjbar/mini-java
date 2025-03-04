@@ -1,10 +1,13 @@
 (* Import *)
 
-open Format
 open X86_64
 open Ast
 open Compile_utils
 open Compile_algo
+
+(* TEMPORAIRE *)
+
+let in_print = ref false
 
 (* Data *)
 
@@ -43,6 +46,8 @@ let rec compile_expr (e : expr) : text =
   | Econstant (Cint n) -> pushq @@ imm @@ Int32.to_int n
   | Econstant (Cstring s as cst) ->
     (* Pushq string ? *)
+    if not !in_print then failwith "String in stack : TODO";
+
     let label = new_label_data () in
     Queue.push (label, cst) data_queue;
     nop
@@ -56,12 +61,8 @@ let rec compile_expr (e : expr) : text =
     | Bsub -> subq !%r11 !%r10 ++ pushq !%r10
     | Bmul -> imulq !%r11 !%r10 ++ pushq !%r10
     | Bdiv -> movq !%r10 !%rax ++ cqto ++ idivq !%r11 ++ pushq !%rax
-    | Bmod -> movq !%r10 !%rax ++ idivq !%r11 ++ pushq !%rdx
-    | Beq ->
-      if e1.expr_type = Tclass class_String || e2.expr_type = Tclass class_String then
-        failwith "Beq String String TODO";
-
-      cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
+    | Bmod -> movq !%r10 !%rax ++ cqto ++ idivq !%r11 ++ pushq !%rdx
+    | Beq -> cmpq !%r11 !%r10 ++ sete !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bneq -> cmpq !%r11 !%r10 ++ setne !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Blt -> cmpq !%r11 !%r10 ++ setl !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ movzbq !%al r10 ++ pushq !%r10
@@ -80,19 +81,13 @@ let rec compile_expr (e : expr) : text =
   end
   | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
   | Enull -> pushq @@ imm 0
-  | Evar var -> debug_text "var" @@ pushq (ind ~ofs:(-var.var_ofs) rbp)
+  | Evar var -> debug_text "var" @@ pushq (ind ~ofs:var.var_ofs rbp)
   | Eassign_var (var, e) ->
-    Format.printf " assign var %s\n" var.var_name;
-
     debug_text "assign_var"
-    @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp) ++ pushq !%r10)
+      (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:var.var_ofs rbp) ++ pushq !%r10)
   | Eattr (e, attr) ->
-    Format.printf " attr %s\n" attr.attr_name;
-
-    debug_text "attr" @@ (compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10))
+    debug_text "attr" (compile_expr e ++ popq r10 ++ pushq (ind ~ofs:attr.attr_ofs r10))
   | Eassign_attr (e1, attr, e2) ->
-    Format.printf " assign attr %s\n" attr.attr_name;
-
     debug_text "assign_attr"
     @@ compile_expr e1 ++ compile_expr e2 ++ popq r11 ++ popq r10
        ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
@@ -101,44 +96,48 @@ let rec compile_expr (e : expr) : text =
     (* le résultat est stocké dans RAX *)
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
-    let push_obj = pushq !%rax in
-    let call_constr =
-      movq (ind rax) !%rcx ++ movq (ind ~ofs:8 rcx) !%rdx ++ movq !%rax !%rdi ++ call_star !%rdx
-    in
-    (* let call_constr =
-      let obj = make_expr (Evar (make_var "" (Tclass cls) 0)) (Tclass cls) in
-      let meth = Hashtbl.find cls.class_methods cls.class_name in
-      let expr = make_expr (Ecall (obj, meth, exprs)) Tvoid in
-      compile_expr expr *)
 
-    debug_text "new" @@ (malloc ++ set_descriptor ++ push_obj ++ call_constr)
+    let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
+    let push_obj = pushq !%rax in
+
+    let call_constr = call @@ get_name_constr cls in
+
+    debug_text "new" (malloc ++ set_descriptor ++ params ++ push_obj ++ call_constr)
   | Ecall (e, meth, exprs) ->
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let this = compile_expr e in
     let call = call_star (ind ~ofs:meth.meth_ofs rsp) in
 
-    debug_text "call" @@ (params ++ this ++ call)
+    debug_text "call" (params ++ this ++ call)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->
+    in_print := true;
+
     let compiled_expr = compile_expr expr in
 
-    debug_text "print"
-    @@ compiled_expr
-       ++ movq (ilab @@ get_label_data ()) !%rdi
-       ++ addq (imm 8) !%rdi
-       ++ call label_print_function
+    let text =
+      debug_text "print"
+      @@ compiled_expr
+         ++ movq (ilab @@ get_label_data ()) !%rdi
+         ++ addq (imm 8) !%rdi
+         ++ call label_print_function ++ pushq !%rax
+    in
+
+    in_print := false;
+    text
 
 (* Compile stmt *)
 
 and compile_stmt : stmt -> text = function
   | Sexpr expr -> compile_expr expr ++ comment "Je suis CE soffretu :" ++ popq r10
   | Svar (var, e) ->
-    debug_text "Svar" @@ (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:(-var.var_ofs) rbp))
+    debug_text "Svar" (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:var.var_ofs rbp))
   | Sif (e, s1, s2) -> compile_if compile_expr compile_stmt e s1 s2
   | Sreturn (Some e) ->
-    debug_text "return" @@ (movq !%rbp !%rsp ++ popq rbp ++ compile_expr e ++ ret)
-  | Sreturn None -> debug_text "return" @@ (movq !%rbp !%rsp ++ popq rbp ++ ret)
+    debug_text "return"
+      (movq !%rbp !%rsp ++ popq rbp ++ compile_expr e ++ popq r10 ++ movq !%r10 !%rax ++ ret)
+  | Sreturn None -> debug_text "return" (movq !%rbp !%rsp ++ popq rbp ++ ret)
   | Sblock stmts -> compile_stmts stmts
   | Sfor (s1, e, s2, s3) -> compile_for compile_expr compile_stmt s1 e s2 s3
 
