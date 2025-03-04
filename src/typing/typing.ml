@@ -269,7 +269,7 @@ let type_decl : pdecl -> decl = function
     current_return_type := Tvoid;
 
     let vars, env =
-      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params
+      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params params
     in
     let block = type_stmt env block |> snd in
     Dconstructor (vars, block)
@@ -280,7 +280,7 @@ let type_decl : pdecl -> decl = function
     current_return_type := typ;
 
     let vars, env =
-      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params
+      env_from_params classes (Hashtbl.find !current_class.class_methods name.id).meth_params params
     in
     let m = make_method name.id typ vars ~-1 in
     let block = type_stmt env block |> snd in

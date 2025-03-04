@@ -119,18 +119,22 @@ let update_classes (classes : classes) (p : pfile) : unit =
 
 (* Init vars and env for typing method & constr *)
 
-let env_from_params (classes : classes) (params : var list) : var list * typing_env =
+let env_from_params (classes : classes) (params : var list) (pparams : pparam list) :
+  var list * typing_env =
   let vars, env =
-    List.fold_left
+    List.fold_left2
       begin
-        fun (vars, env) var ->
-          let name = var.var_name in
-          if Env.mem name env then error "The parameter %s is already defined" name;
+        fun (vars, env) var (_, id) ->
+          if var.var_name <> id.id then
+            failwith "Inconsistency in env_from_params between pparams and already computed params.";
+
+          let name, loc = (var.var_name, id.loc) in
+          if Env.mem name env then error ~loc "The parameter %s is already defined" name;
 
           let env = Env.add var.var_name var env in
           (var :: vars, env)
       end
-      ([], Env.empty) params
+      ([], Env.empty) params pparams
   in
   (List.rev vars, env)
 
