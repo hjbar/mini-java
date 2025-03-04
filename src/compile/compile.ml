@@ -81,7 +81,9 @@ let rec compile_expr (e : expr) : text =
   end
   | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
   | Enull -> pushq @@ imm 0
-  | Evar var -> debug_text "var" @@ pushq (ind ~ofs:var.var_ofs rbp)
+  | Evar var ->
+    Format.printf "accesing var %s at offset %d\n" var.var_name var.var_ofs;
+    debug_text "var" @@ pushq (ind ~ofs:var.var_ofs rbp)
   | Eassign_var (var, e) ->
     debug_text "assign_var"
       (compile_expr e ++ popq r10 ++ movq !%r10 (ind ~ofs:var.var_ofs rbp) ++ pushq !%r10)
@@ -100,16 +102,19 @@ let rec compile_expr (e : expr) : text =
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
 
     let call_constr = call @@ get_name_constr cls in
+    let depile = addq (imm (8 * (List.length exprs + 1))) !%rsp in
 
-    debug_text "new" (malloc ++ set_descriptor ++ params ++ push_obj ++ call_constr)
+    debug_text "new"
+      (malloc ++ set_descriptor ++ params ++ push_obj ++ call_constr ++ depile ++ push_obj)
   | Ecall (e, meth, exprs) ->
-    let get_class = pushq (ind rsp) ++ popq r10 in
+    let get_class = movq (ind rsp) !%r10 in
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
     let this = compile_expr e in
     let call = movq (ind r10) !%r11 ++ call_star (ind ~ofs:meth.meth_ofs r11) in
+    let depile = addq (imm (8 * (List.length exprs + 1))) !%rsp in
     let ret_val = pushq !%rax in
 
-    debug_text "call" (this ++ get_class ++ params ++ call ++ ret_val)
+    debug_text "call" (params ++ this ++ get_class ++ call ++ depile ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
   | Einstanceof (e, s) -> failwith "Einstanceof e s TODO"
   | Eprint expr ->

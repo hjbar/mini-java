@@ -165,8 +165,11 @@ let compile_locals (stmt : Ast.stmt) : X86_64.text =
 
   let rec loop = function
     | Svar (var, _) ->
-      cpt := !cpt + 8;
-      var.var_ofs <- - !cpt
+      if var.var_ofs = -1 then begin
+        cpt := !cpt + 8;
+        var.var_ofs <- - !cpt;
+        Printf.printf "var %s at offset %d\n" var.var_name var.var_ofs
+      end
     | Sif (_, s1, s2) ->
       loop s1;
       loop s2
