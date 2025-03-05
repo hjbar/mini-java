@@ -269,7 +269,7 @@ let compile_string_of_int () : text =
   label label_string_of_int_function
   ++ pushq !%rbp ++ movq !%rsp !%rbp
   ++ andq (imm ~-16) !%rsp
-  ++ movq !%rsi !%rdi
+  ++ movq !%rsi !%rdx
   ++ movq (ilab label_string_of_int_data) !%rsi
   ++ xorq !%rax !%rax ++ call "sprintf" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
 

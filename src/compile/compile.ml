@@ -64,20 +64,30 @@ let rec compile_expr (e : expr) : text =
     | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Badd_s ->
-      let len_s1 = movq (ind ~ofs:8 r10) !%rdi ++ call label_strlen_function ++ movq !%rax !%r8 in
-      let len_s2 = movq (ind ~ofs:8 r11) !%rdi ++ call label_strlen_function ++ movq !%rax !%r9 in
-      let block =
-        addq !%r8 !%r9
-        ++ addq (imm 1) !%r9
-        ++ movq !%r9 !%rdi ++ call label_malloc_function ++ movq !%rax !%r9
+      let len_s1 =
+        movq !%r10 !%r12 ++ movq !%r12 !%rdi
+        ++ addq (imm 8) !%rdi
+        ++ call label_strlen_function ++ movq !%rax !%r14
       in
-      let copy = movq !%r9 !%rdi ++ movq !%r10 !%rsi ++ call label_strcpy_function in
-      let concat = movq !%r9 !%rdi ++ movq !%r11 !%rsi ++ call label_strcat_function in
+      let len_s2 =
+        movq !%r11 !%r13 ++ movq !%r13 !%rdi
+        ++ addq (imm 8) !%rdi
+        ++ call label_strlen_function ++ movq !%rax !%r15
+      in
+      let block =
+        addq !%r14 !%r15
+        ++ addq (imm 9) !%r15
+        ++ movq !%r15 !%rdi ++ call label_malloc_function ++ movq !%rax !%r15
+      in
+      let copy =
+        movq !%r15 !%rdi ++ movq !%r12 !%rsi ++ addq (imm 8) !%rsi ++ call label_strcpy_function
+      in
+      let concat = movq !%r15 !%rdi ++ movq !%r13 !%rsi ++ call label_strcat_function in
       let string =
         movq (imm 16) !%rdi
         ++ call label_malloc_function
         ++ movq (get_ilab_class class_String) (ind rax)
-        ++ movq !%r9 (ind ~ofs:8 rax)
+        ++ movq !%r15 (ind ~ofs:8 rax)
         ++ pushq !%rax
       in
 
