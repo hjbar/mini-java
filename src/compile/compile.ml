@@ -80,16 +80,20 @@ let rec compile_expr (e : expr) : text =
         ++ movq !%r15 !%rdi ++ call label_malloc_function ++ movq !%rax !%r15
       in
       let copy =
-        movq !%r15 !%rdi ++ movq !%r12 !%rsi ++ addq (imm 8) !%rsi ++ call label_strcpy_function
+        movq !%r15 !%rdi
+        ++ addq (imm 8) !%rdi
+        ++ movq !%r12 !%rsi
+        ++ addq (imm 8) !%rsi
+        ++ call label_strcpy_function
       in
-      let concat = movq !%r15 !%rdi ++ movq !%r13 !%rsi ++ call label_strcat_function in
-      let string =
-        movq (imm 16) !%rdi
-        ++ call label_malloc_function
-        ++ movq (get_ilab_class class_String) (ind rax)
-        ++ movq !%r15 (ind ~ofs:8 rax)
-        ++ pushq !%rax
+      let concat =
+        movq !%r15 !%rdi
+        ++ addq (imm 8) !%rdi
+        ++ movq !%r13 !%rsi
+        ++ addq (imm 8) !%rsi
+        ++ call label_strcat_function
       in
+      let string = movq (get_ilab_class class_String) (ind r15) ++ pushq !%r15 in
 
       len_s1 ++ len_s2 ++ block ++ copy ++ concat ++ string
     | Band | Bor -> assert false
