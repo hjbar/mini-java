@@ -112,6 +112,32 @@ let compile_for :
     ++ cmpq (imm 0) !%r10
     ++ je label_done ++ compile_stmt s3 ++ compile_stmt s2 ++ jmp label_do ++ label label_done
 
+(* Instanceof *)
+
+let compile_instanceof : (Ast.expr -> X86_64.text) -> Ast.expr -> string -> text =
+  let cpt = ref ~-1 in
+  fun compile_expr e s ->
+    incr cpt;
+    let label_false = Format.sprintf "instanceof_false_%d" !cpt in
+    let label_true = Format.sprintf "instanceof_true_%d" !cpt in
+    let label_loop = Format.sprintf "instanceof_loop_%d" !cpt in
+    let label_done = Format.sprintf "instanceof_done_%d" !cpt in
+
+    compile_expr e ++ popq r10
+    ++ cmpq (imm 0) !%r10
+    ++ je label_false
+    ++ movq (ind r10) !%r10
+    ++ label label_loop
+    ++ cmpq (ilab @@ Format.sprintf "C_%s" s) !%r10
+    ++ je label_true
+    ++ movq (ind r10) !%r10
+    ++ cmpq (ilab "C_Object") !%r10
+    ++ je label_false ++ jmp label_loop ++ label label_false
+    ++ pushq (imm 0)
+    ++ jmp label_done ++ label label_true
+    ++ pushq (imm 1)
+    ++ label label_done
+
 (* Attributes *)
 
 let init_attribute_offset (cls : class_) : unit =
