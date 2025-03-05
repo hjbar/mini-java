@@ -64,15 +64,12 @@ let rec compile_expr (e : expr) : text =
     | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Badd_s ->
+      let save_strings = movq !%r10 !%r12 ++ movq !%r11 !%r13 in
       let len_s1 =
-        movq !%r10 !%r12 ++ movq !%r12 !%rdi
-        ++ addq (imm 8) !%rdi
-        ++ call label_strlen_function ++ movq !%rax !%r14
+        movq !%r12 !%rdi ++ addq (imm 8) !%rdi ++ call label_strlen_function ++ movq !%rax !%r14
       in
       let len_s2 =
-        movq !%r11 !%r13 ++ movq !%r13 !%rdi
-        ++ addq (imm 8) !%rdi
-        ++ call label_strlen_function ++ movq !%rax !%r15
+        movq !%r13 !%rdi ++ addq (imm 8) !%rdi ++ call label_strlen_function ++ movq !%rax !%r15
       in
       let block =
         addq !%r14 !%r15
@@ -95,7 +92,7 @@ let rec compile_expr (e : expr) : text =
       in
       let string = movq (get_ilab_class class_String) (ind r15) ++ pushq !%r15 in
 
-      len_s1 ++ len_s2 ++ block ++ copy ++ concat ++ string
+      save_strings ++ len_s1 ++ len_s2 ++ block ++ copy ++ concat ++ string
     | Band | Bor -> assert false
   end
   | Eunop (op, e) -> begin
@@ -105,14 +102,16 @@ let rec compile_expr (e : expr) : text =
     | Uneg -> negq !%r10 ++ pushq !%r10
     | Unot -> xorq (imm 1) !%r10 ++ pushq !%r10
     | Ustring_of_int ->
-      movq (imm 16) !%rdi
-      ++ call label_malloc_function ++ movq !%rax !%r15 ++ movq !%rax !%rdi ++ movq !%r10 !%rsi
-      ++ call label_string_of_int_function
-      ++ movq (imm 16) !%rdi
-      ++ call label_malloc_function
-      ++ movq (get_ilab_class class_String) (ind rax)
-      ++ movq !%r15 (ind ~ofs:8 rax)
-      ++ pushq !%rax
+      let save_int = movq !%r10 !%r12 in
+      let block = movq (imm 16) !%rdi ++ call label_malloc_function ++ movq !%rax !%r13 in
+      let sprintf =
+        movq !%r13 !%rdi
+        ++ addq (imm 8) !%rdi
+        ++ movq !%r12 !%rsi ++ call label_string_of_int_function
+      in
+      let string = movq (get_ilab_class class_String) (ind r13) ++ pushq !%r13 in
+
+      save_int ++ block ++ sprintf ++ string
   end
   | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
   | Enull -> pushq @@ imm 0
