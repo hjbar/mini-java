@@ -231,7 +231,7 @@ let compile_malloc () : text =
 let compile_strcmp () : text =
   let label = label label_strcmp_function in
   let push_alig = pushq !%rbp ++ movq !%rsp !%rbp ++ andq (imm ~-16) !%rsp in
-  let calc = call "strcmp" ++ cmpl (imm 0) !%eax ++ sete !%al ++ movzbq !%al rax in
+  let calc = call "strcmp" ++ cmpq (imm 0) !%rax ++ sete !%al ++ movzbq !%al rax in
   let pop_alig = movq !%rbp !%rsp ++ popq rbp in
   let ret = ret in
 
