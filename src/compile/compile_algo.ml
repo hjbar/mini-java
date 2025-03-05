@@ -6,6 +6,31 @@ open X86_64
 
 (* Methods for descriptors *)
 
+module StringSet = Set.Make (String)
+module StringMap = Map.Make (String)
+
+let update_method_list (old_methods : (string * method_) list)
+  (new_methods : (string * method_) list) =
+  let old_method_map =
+    List.fold_left
+      (fun acc (_, m) -> StringMap.add m.meth_name m.meth_ofs acc)
+      StringMap.empty old_methods
+  in
+  List.iter
+    (fun (_, m) ->
+      match StringMap.find_opt m.meth_name old_method_map with
+      | Some old_offset -> m.meth_ofs <- old_offset
+      | None -> () )
+    new_methods;
+
+  let new_method_names =
+    List.fold_left (fun acc (_, m) -> StringSet.add m.meth_name acc) StringSet.empty new_methods
+  in
+  let filtered_old_methods =
+    List.filter (fun (_, m) -> not (StringSet.mem m.meth_name new_method_names)) old_methods
+  in
+  filtered_old_methods @ new_methods
+
 let get_methods (class_ : class_) : (string * method_) list =
   let ofs = ref 8 in
   let rec aux class_ =
@@ -13,21 +38,23 @@ let get_methods (class_ : class_) : (string * method_) list =
     match c_name with
     | "Object" -> []
     | _ ->
-      aux class_.class_extends
-      |> List.append
-           begin
-             Hashtbl.fold
-               begin
-                 fun _ k acc ->
-                   if k.meth_ofs = -1 then begin
-                     k.meth_ofs <- !ofs;
-                     ofs := !ofs + 8
-                   end
-                   else ofs := k.meth_ofs + 8;
-                   (c_name, k) :: acc
-               end
-               class_.class_methods []
-           end
+      let nl = aux class_.class_extends in
+      let sl =
+        begin
+          Hashtbl.fold
+            begin
+              fun _ k acc ->
+                if k.meth_ofs = -1 then begin
+                  k.meth_ofs <- !ofs;
+                  ofs := !ofs + 8
+                end
+                else ofs := k.meth_ofs + 8;
+                (c_name, k) :: acc
+            end
+            class_.class_methods []
+        end
+      in
+      update_method_list nl sl
   in
   aux class_
 
