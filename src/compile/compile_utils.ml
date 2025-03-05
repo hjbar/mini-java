@@ -3,6 +3,10 @@
 open X86_64
 open Ast
 
+(* Build-in classes *)
+
+let class_String = Typing_utils.class_String
+
 (* Debug *)
 
 let debug = ref false
@@ -24,7 +28,17 @@ let label_malloc_function = "M_malloc"
 
 let label_strcmp_function = "M_strcmp"
 
+let label_string_of_int_function = "M_string_of_int"
+
+let label_strlen_function = "M_strlen"
+
+let label_strcpy_function = "M_strcpy"
+
+let label_strcat_function = "M_strcat"
+
 let label_print_data = ".D_print_string"
+
+let label_string_of_int_data = ".D_string_of_int"
 
 let label_main = "M_Main_main"
 

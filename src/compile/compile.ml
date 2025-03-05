@@ -63,7 +63,25 @@ let rec compile_expr (e : expr) : text =
     | Ble -> cmpq !%r11 !%r10 ++ setle !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bgt -> cmpq !%r11 !%r10 ++ setg !%al ++ movzbq !%al r10 ++ pushq !%r10
     | Bge -> cmpq !%r11 !%r10 ++ setge !%al ++ movzbq !%al r10 ++ pushq !%r10
-    | Badd_s -> failwith "Ebinop Badd_s e1 e2 TODO"
+    | Badd_s ->
+      let len_s1 = movq (ind ~ofs:8 r10) !%rdi ++ call label_strlen_function ++ movq !%rax !%r8 in
+      let len_s2 = movq (ind ~ofs:8 r11) !%rdi ++ call label_strlen_function ++ movq !%rax !%r9 in
+      let block =
+        addq !%r8 !%r9
+        ++ addq (imm 1) !%r9
+        ++ movq !%r9 !%rdi ++ call label_malloc_function ++ movq !%rax !%r9
+      in
+      let copy = movq !%r9 !%rdi ++ movq !%r10 !%rsi ++ call label_strcpy_function in
+      let concat = movq !%r9 !%rdi ++ movq !%r11 !%rsi ++ call label_strcat_function in
+      let string =
+        movq (imm 16) !%rdi
+        ++ call label_malloc_function
+        ++ movq (get_ilab_class class_String) (ind rax)
+        ++ movq !%r9 (ind ~ofs:8 rax)
+        ++ pushq !%rax
+      in
+
+      len_s1 ++ len_s2 ++ block ++ copy ++ concat ++ string
     | Band | Bor -> assert false
   end
   | Eunop (op, e) -> begin
@@ -72,7 +90,15 @@ let rec compile_expr (e : expr) : text =
     match op with
     | Uneg -> negq !%r10 ++ pushq !%r10
     | Unot -> xorq (imm 1) !%r10 ++ pushq !%r10
-    | Ustring_of_int -> failwith "Eunop Ustring_of_int e TODO"
+    | Ustring_of_int ->
+      movq (imm 16) !%rdi
+      ++ call label_malloc_function ++ movq !%rax !%r15 ++ movq !%rax !%rdi ++ movq !%r10 !%rsi
+      ++ call label_string_of_int_function
+      ++ movq (imm 16) !%rdi
+      ++ call label_malloc_function
+      ++ movq (get_ilab_class class_String) (ind rax)
+      ++ movq !%r15 (ind ~ofs:8 rax)
+      ++ pushq !%rax
   end
   | Ethis -> debug_text "this" @@ pushq (ind ~ofs:16 rbp)
   | Enull -> pushq @@ imm 0
@@ -123,7 +149,9 @@ let rec compile_expr (e : expr) : text =
 
     debug_text "call" (params ++ this ++ get_class ++ call ++ depile ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
-  | Einstanceof (e, s) -> debug_text "instanceof" @@ compile_instanceof compile_expr e s
+  | Einstanceof (e, s) ->
+    failwith
+      "Einstanceof e s TODO" (* debug_text "instanceof" @@ compile_instanceof compile_expr e s *)
   | Eprint expr ->
     compile_expr expr ++ popq rdi ++ addq (imm 8) !%rdi ++ call label_print_function ++ pushq !%rax
 
@@ -168,16 +196,19 @@ let compile_classes (p : tfile) =
 (* Compile data *)
 
 let compile_static_data () : data =
-  label label_print_data ++ string "%s"
+  label label_print_data ++ string "%s" ++ label label_string_of_int_data ++ string "%d"
   ++ Queue.fold
-       (fun acc (label_name, str) -> acc ++ label label_name ++ dquad [ 0 ] ++ string str)
+       (fun acc (label_name, str) ->
+         acc ++ label label_name ++ address [ "C_" ^ class_String.class_name ] ++ string str )
        nop data_queue
 
 let compile_data () : data = compile_static_data () ++ get_descriptors descriptors
 
 (* Compile build-in function *)
 
-let compile_build_in () = compile_printf () ++ compile_malloc () ++ compile_strcmp ()
+let compile_build_in () =
+  compile_printf () ++ compile_malloc () ++ compile_strcmp () ++ compile_string_of_int ()
+  ++ compile_strlen () ++ compile_strcpy () ++ compile_strcat ()
 
 let compile_main (p : tfile) =
   globl "main" ++ label "main" ++ call label_main ++ xorq !%rax !%rax ++ ret ++ compile_classes p

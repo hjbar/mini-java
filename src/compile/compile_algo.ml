@@ -262,3 +262,34 @@ let compile_strcmp () : text =
   let ret = ret in
 
   label ++ push_alig ++ calc ++ pop_alig ++ ret
+
+(* String_of_int *)
+
+let compile_string_of_int () : text =
+  label label_string_of_int_function
+  ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ movq !%rsi !%rdi
+  ++ movq (ilab label_string_of_int_data) !%rsi
+  ++ xorq !%rax !%rax ++ call "sprintf" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Strlen *)
+
+let compile_strlen () : text =
+  label label_strlen_function ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ call "strlen" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Strcpy *)
+
+let compile_strcpy () : text =
+  label label_strcpy_function ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ call "strcpy" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Strcat *)
+
+let compile_strcat () : text =
+  label label_strcat_function ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ call "strcat" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
