@@ -103,6 +103,25 @@ let compile_instanceof : (Ast.expr -> X86_64.text) -> Ast.expr -> string -> X86_
     ++ pushq (imm 1)
     ++ label label_done
 
+(* Cast *)
+
+let compile_cast : (Ast.expr -> X86_64.text) -> Ast.class_ -> Ast.expr -> X86_64.text =
+  let cpt = ref ~-1 in
+  fun compile_expr cls e ->
+    incr cpt;
+    let label_exit = Format.sprintf "cast_exit_%d" !cpt in
+    let label_done = Format.sprintf "cast_done_%d" !cpt in
+    let label_loop = Format.sprintf "cast_loop_%d" !cpt in
+
+    compile_expr e ++ popq r12
+    ++ cmpq (imm 0) !%r12
+    ++ je label_done ++ label label_loop
+    ++ movq (ind r12) !%r12
+    ++ cmpq (ilab @@ Format.sprintf "C_%s" cls.class_name) !%r12
+    ++ je label_done
+    ++ cmpq (get_ilab_class class_Object) !%r12
+    ++ je label_exit ++ jmp label_loop ++ label label_exit ++ call label_exit ++ label label_done
+
 (* Local variables *)
 
 let compile_locals (stmt : Ast.stmt) : X86_64.text =
@@ -201,3 +220,11 @@ let compile_strcat : X86_64.text =
   label label_strcat_function ++ pushq !%rbp ++ movq !%rsp !%rbp
   ++ andq (imm ~-16) !%rsp
   ++ call "strcat" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+
+(* Exit *)
+
+let compile_exit : X86_64.text =
+  label label_exit_function ++ pushq !%rbp ++ movq !%rsp !%rbp
+  ++ andq (imm ~-16) !%rsp
+  ++ movq (imm 1) !%rdi
+  ++ call "exit" ++ movq !%rbp !%rsp ++ popq rbp ++ ret

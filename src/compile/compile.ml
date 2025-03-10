@@ -133,7 +133,7 @@ let rec compile_expr (e : expr) : text =
     let ret_val = pushq !%rax in
 
     debug_text "call" (params ++ this ++ get_class ++ call ++ depile ++ ret_val)
-  | Ecast (cls, e) -> failwith "Ecast cls e TODO"
+  | Ecast (cls, e) -> debug_text "cast" @@ compile_cast compile_expr cls e
   | Einstanceof (e, s) -> debug_text "instanceof" @@ compile_instanceof compile_expr e s
   | Eprint expr ->
     compile_expr expr ++ popq rdi ++ addq (imm 8) !%rdi ++ call label_print_function ++ pushq !%rax

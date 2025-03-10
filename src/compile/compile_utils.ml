@@ -32,6 +32,8 @@ let label_strcpy_function = "M_strcpy"
 
 let label_strcat_function = "M_strcat"
 
+let label_exit_function = "M_exit"
+
 let label_print_data = ".D_print_string"
 
 let label_string_of_int_data = ".D_string_of_int"
