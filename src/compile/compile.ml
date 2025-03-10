@@ -136,16 +136,18 @@ let rec compile_expr (e : expr) : text =
        ++ movq !%r11 (ind ~ofs:attr.attr_ofs r10)
        ++ pushq !%r11
   | Enew (cls, exprs) ->
+    let space = 8 * (List.length exprs + 1) in
+
     let malloc = movq (imm (8 * (get_nb_attribute cls + 1))) !%rdi ++ call label_malloc_function in
     let set_descriptor = movq (get_ilab_class cls) (ind rax) in
     let save_obj = pushq !%rax in
 
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
 
-    let push_obj = pushq !%rax in
+    let push_obj = pushq (ind ~ofs:(space - 8) rsp) in
 
     let call_constr = call @@ get_name_constr cls in
-    let depile = addq (imm (8 * (List.length exprs + 1))) !%rsp in
+    let depile = addq (imm space) !%rsp in
 
     debug_text "new"
       (malloc ++ set_descriptor ++ save_obj ++ params ++ push_obj ++ call_constr ++ depile)
