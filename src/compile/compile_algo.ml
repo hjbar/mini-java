@@ -113,7 +113,7 @@ let compile_cast : (Ast.expr -> X86_64.text) -> Ast.class_ -> Ast.expr -> X86_64
     let label_done = Format.sprintf "cast_done_%d" !cpt in
     let label_loop = Format.sprintf "cast_loop_%d" !cpt in
 
-    compile_expr e ++ popq r12
+    compile_expr e ++ popq r13 ++ movq !%r13 !%r12
     ++ cmpq (imm 0) !%r12
     ++ je label_done ++ label label_loop
     ++ movq (ind r12) !%r12
@@ -121,6 +121,7 @@ let compile_cast : (Ast.expr -> X86_64.text) -> Ast.class_ -> Ast.expr -> X86_64
     ++ je label_done
     ++ cmpq (get_ilab_class class_Object) !%r12
     ++ je label_exit ++ jmp label_loop ++ label label_exit ++ call label_exit ++ label label_done
+    ++ pushq !%r13
 
 (* Local variables *)
 
