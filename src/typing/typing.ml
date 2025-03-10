@@ -181,7 +181,8 @@ let rec type_expr (env : typing_env) (expr : pexpr) : expr =
     check_equiv_type ~loc:e.pexpr_loc typ typed_e.expr_type;
 
     match typ with
-    | Tclass _ -> make_expr (Ecast (get_class_type typ, typed_e)) typ
+    | Tclass _ when not (typed_e.expr_type <=* typ) ->
+      make_expr (Ecast (get_class_type typ, typed_e)) typ
     | _ -> make_expr typed_e.expr_desc typ
   end
   | PEinstanceof (e, typ) ->
