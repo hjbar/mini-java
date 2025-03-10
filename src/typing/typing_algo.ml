@@ -1,4 +1,4 @@
-(* IMPORT *)
+(* Import *)
 
 open Ast
 open Typing_utils
