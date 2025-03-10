@@ -35,8 +35,12 @@ let rec compile_expr (e : expr) : text =
     | Badd -> addq !%r13 !%r12 ++ pushq !%r12
     | Bsub -> subq !%r13 !%r12 ++ pushq !%r12
     | Bmul -> imulq !%r13 !%r12 ++ pushq !%r12
-    | Bdiv -> movq !%r12 !%rax ++ cqto ++ idivq !%r13 ++ pushq !%rax
-    | Bmod -> movq !%r12 !%rax ++ cqto ++ idivq !%r13 ++ pushq !%rdx
+    | Bdiv ->
+      cmpq (imm 0) !%r13
+      ++ je label_exit_function ++ movq !%r12 !%rax ++ cqto ++ idivq !%r13 ++ pushq !%rax
+    | Bmod ->
+      cmpq (imm 0) !%r13
+      ++ je label_exit_function ++ movq !%r12 !%rax ++ cqto ++ idivq !%r13 ++ pushq !%rdx
     | Beq -> cmpq !%r13 !%r12 ++ sete !%al ++ movzbq !%al r12 ++ pushq !%r12
     | Bneq -> cmpq !%r13 !%r12 ++ setne !%al ++ movzbq !%al r12 ++ pushq !%r12
     | Blt -> cmpq !%r13 !%r12 ++ setl !%al ++ movzbq !%al r12 ++ pushq !%r12
@@ -98,10 +102,16 @@ let rec compile_expr (e : expr) : text =
     debug_text "assign_var"
       (compile_expr e ++ popq r12 ++ movq !%r12 (ind ~ofs:var.var_ofs rbp) ++ pushq !%r12)
   | Eattr (e, attr) ->
-    debug_text "attr" (compile_expr e ++ popq r12 ++ pushq (ind ~ofs:attr.attr_ofs r12))
+    debug_text "attr"
+      ( compile_expr e ++ popq r12
+      ++ cmpq (imm 0) !%r12
+      ++ je label_exit_function
+      ++ pushq (ind ~ofs:attr.attr_ofs r12) )
   | Eassign_attr (e1, attr, e2) ->
     debug_text "assign_attr"
-    @@ compile_expr e1 ++ compile_expr e2 ++ popq r13 ++ popq r12
+    @@ compile_expr e1 ++ popq r12
+       ++ cmpq (imm 0) !%r12
+       ++ je label_exit_function ++ pushq !%r12 ++ compile_expr e2 ++ popq r13 ++ popq r12
        ++ movq !%r13 (ind ~ofs:attr.attr_ofs r12)
        ++ pushq !%r13
   | Enew (cls, exprs) ->
@@ -124,7 +134,9 @@ let rec compile_expr (e : expr) : text =
     let stack_space = 8 * (List.length exprs + 1) in
 
     let params = List.fold_left (fun acc expr -> compile_expr expr ++ acc) nop exprs in
-    let this = compile_expr e in
+    let this =
+      compile_expr e ++ popq r12 ++ cmpq (imm 0) !%r12 ++ je label_exit_function ++ pushq !%r12
+    in
 
     let get_class = movq (ind rsp) !%r12 in
     let call = movq (ind r12) !%r13 ++ call_star (ind ~ofs:meth.meth_ofs r13) in
@@ -198,7 +210,7 @@ let compile_data () : data = compile_static_data () ++ get_descriptors descripto
 
 let compile_build_in =
   compile_printf ++ compile_malloc ++ compile_strcmp ++ compile_string_of_int ++ compile_strlen
-  ++ compile_strcpy ++ compile_strcat
+  ++ compile_strcpy ++ compile_strcat ++ compile_exit
 
 let compile_main (p : tfile) =
   globl "main" ++ label "main" ++ call label_main ++ xorq !%rax !%rax ++ ret ++ compile_classes p

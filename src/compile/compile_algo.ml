@@ -120,8 +120,8 @@ let compile_cast : (Ast.expr -> X86_64.text) -> Ast.class_ -> Ast.expr -> X86_64
     ++ cmpq (ilab @@ Format.sprintf "C_%s" cls.class_name) !%r12
     ++ je label_done
     ++ cmpq (get_ilab_class class_Object) !%r12
-    ++ je label_exit ++ jmp label_loop ++ label label_exit ++ call label_exit ++ label label_done
-    ++ pushq !%r13
+    ++ je label_exit ++ jmp label_loop ++ label label_exit ++ call label_exit_function
+    ++ label label_done ++ pushq !%r13
 
 (* Local variables *)
 
@@ -224,8 +224,4 @@ let compile_strcat : X86_64.text =
 
 (* Exit *)
 
-let compile_exit : X86_64.text =
-  label label_exit_function ++ pushq !%rbp ++ movq !%rsp !%rbp
-  ++ andq (imm ~-16) !%rsp
-  ++ movq (imm 1) !%rdi
-  ++ call "exit" ++ movq !%rbp !%rsp ++ popq rbp ++ ret
+let compile_exit : X86_64.text = label label_exit_function ++ movq (imm 1) !%rdi ++ call "exit"
