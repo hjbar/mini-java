@@ -92,13 +92,11 @@ let compile_instanceof : (Ast.expr -> X86_64.text) -> Ast.expr -> string -> X86_
 
     compile_expr e ++ popq r12
     ++ cmpq (imm 0) !%r12
-    ++ je label_false
+    ++ je label_false ++ label label_loop
     ++ movq (ind r12) !%r12
-    ++ label label_loop
     ++ cmpq (ilab @@ Format.sprintf "C_%s" s) !%r12
     ++ je label_true
-    ++ movq (ind r12) !%r12
-    ++ cmpq (ilab "C_Object") !%r12
+    ++ cmpq (get_ilab_class class_Object) !%r12
     ++ je label_false ++ jmp label_loop ++ label label_false
     ++ pushq (imm 0)
     ++ jmp label_done ++ label label_true

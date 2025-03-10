@@ -134,9 +134,7 @@ let rec compile_expr (e : expr) : text =
 
     debug_text "call" (params ++ this ++ get_class ++ call ++ depile ++ ret_val)
   | Ecast (cls, e) -> failwith "Ecast cls e TODO"
-  | Einstanceof (e, s) ->
-    failwith
-      "Einstanceof e s TODO" (* debug_text "instanceof" @@ compile_instanceof compile_expr e s *)
+  | Einstanceof (e, s) -> debug_text "instanceof" @@ compile_instanceof compile_expr e s
   | Eprint expr ->
     compile_expr expr ++ popq rdi ++ addq (imm 8) !%rdi ++ call label_print_function ++ pushq !%rax
 

@@ -63,6 +63,8 @@ let is_type_string e =
 
 (* Build-in classes *)
 
+let class_Object = Typing_utils.class_Object
+
 let class_String = Typing_utils.class_String
 
 (* Methods for descriptors *)
