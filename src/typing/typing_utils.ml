@@ -69,17 +69,17 @@ let typ_to_string = function
   | Tint -> "int"
   | Tclass c -> c.class_name
 
-let is_class_type : typ -> bool = function Tclass _ -> true | _ -> false
+let is_class_type = function Tclass _ -> true | _ -> false
 
-let ( =* ) (typ1 : typ) (typ2 : typ) : bool =
+let ( =* ) typ1 typ2 =
   match (typ1, typ2) with
   | Tclass c1, Tclass c2 -> c1.class_name = c2.class_name
   | Tvoid, Tvoid | Tnull, Tnull | Tint, Tint | Tboolean, Tboolean -> true
   | _ -> false
 
-let ( <>* ) (typ1 : typ) (typ2 : typ) : bool = not (typ1 =* typ2)
+let ( <>* ) typ1 typ2 = not (typ1 =* typ2)
 
-let rec ( <=* ) (typ1 : typ) (typ2 : typ) : bool =
+let rec ( <=* ) typ1 typ2 =
   match (typ1, typ2) with
   | Tnull, _ -> true
   | Tint, Tint | Tboolean, Tboolean -> true
@@ -94,15 +94,15 @@ let ( <=>* ) (typ1 : typ) (typ2 : typ) : bool = typ1 <=* typ2 || typ2 <=* typ1
 
 (* Check functions *)
 
-let check_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
+let check_type ?(loc = dummy_loc) typ1 typ2 =
   if typ1 <>* typ2 then
     error ~loc "Type %s expected, but got %s" (typ_to_string typ1) (typ_to_string typ2)
 
-let check_subtype ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
+let check_subtype ?(loc = dummy_loc) typ1 typ2 =
   if not (typ1 <=* typ2) then
     error ~loc "Type %s is not a subtype of %s" (typ_to_string typ1) (typ_to_string typ2)
 
-let check_equiv_type ?(loc = dummy_loc) (typ1 : typ) (typ2 : typ) =
+let check_equiv_type ?(loc = dummy_loc) typ1 typ2 =
   if not (typ1 <=>* typ2) then
     error ~loc "Type %s is not equivalent to %s" (typ_to_string typ1) (typ_to_string typ2)
 
@@ -129,29 +129,29 @@ let make_expr expr_desc expr_type : expr = { expr_desc; expr_type }
 
 (* Function on class *)
 
-let get_class_type : typ -> class_ = function Tclass cls -> cls | _ -> assert false
+let get_class_type = function Tclass cls -> cls | _ -> assert false
 
-let has_attribute (id : string) (c : class_) : bool = Hashtbl.mem c.class_attributes id
+let has_attribute id c = Hashtbl.mem c.class_attributes id
 
-let has_method (id : string) (c : class_) : bool = Hashtbl.mem c.class_methods id
+let has_method id c = Hashtbl.mem c.class_methods id
 
-let exist_class (classes : classes) (c : class_) : bool = Hashtbl.mem classes c.class_name
+let exist_class classes c = Hashtbl.mem classes c.class_name
 
 (* Check functions *)
 
-let check_is_class ~loc (t : typ) =
+let check_is_class ~loc t =
   if not @@ is_class_type t then error ~loc "We expected an expression of type Class here"
 
-let check_is_class_or_null ~loc (t : typ) =
+let check_is_class_or_null ~loc t =
   if not (is_class_type t || t =* Tnull) then
     error ~loc "We have type %s, but Class or Null expected" (typ_to_string t)
 
-let check_exist_class ~loc (classes : classes) (c : class_) : unit =
+let check_exist_class ~loc classes c =
   if not @@ exist_class classes c then error ~loc "Class %s not exist" c.class_name
 
 (* Conversion of types *)
 
-let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ = function
+let get_typ ?(loc : location = dummy_loc) classes = function
   | PTboolean -> Tboolean
   | PTint -> Tint
   | PTident s -> begin
@@ -160,16 +160,11 @@ let get_typ ?(loc : location = dummy_loc) (classes : classes) : pexpr_typ -> typ
     | Some cls -> Tclass cls
   end
 
-let get_typ_opt (classes : classes) : pexpr_typ option -> typ = function
-  | None -> Tvoid
-  | Some typ -> get_typ classes typ
+let get_typ_opt classes = function None -> Tvoid | Some typ -> get_typ classes typ
 
-let cst_to_typ : constant -> typ = function
-  | Cbool _ -> Tboolean
-  | Cint _ -> Tint
-  | Cstring _ -> type_string
+let cst_to_typ = function Cbool _ -> Tboolean | Cint _ -> Tint | Cstring _ -> type_string
 
 (* Conversion of constructions *)
 
-let pparams_to_vars (classes : classes) (params : pparam list) : var list =
+let pparams_to_vars classes params =
   List.map (fun (typ, name) -> make_var name.id (get_typ classes typ) ~-1) params

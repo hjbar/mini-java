@@ -5,8 +5,8 @@ open Typing_utils
 
 (* Init classes for typing  *)
 
-let has_no_cycles (classes : (string, class_) Hashtbl.t) =
-  let rec visit (visited : (string, unit) Hashtbl.t) (c : class_) =
+let has_no_cycles classes =
+  let rec visit visited c =
     match Hashtbl.mem visited c.class_name with
     | true -> error "Cycle detected"
     | false ->
@@ -16,7 +16,7 @@ let has_no_cycles (classes : (string, class_) Hashtbl.t) =
 
   Hashtbl.iter (fun _ c -> visit (Hashtbl.create 16) c) classes
 
-let init_heriarchy (classes : classes) =
+let init_heriarchy classes =
   List.iter
     begin
       fun (id, parent, _) ->
@@ -37,7 +37,7 @@ let init_heriarchy (classes : classes) =
           c.class_extends <- par
     end
 
-let init_classes (classes : classes) (p : pfile) =
+let init_classes classes p =
   (* We expected that Object and String are already in classes *)
   List.iter
     begin
@@ -54,26 +54,26 @@ let init_classes (classes : classes) (p : pfile) =
 
 (* Verify if the method is correct *)
 
-let rec check_has_method_opt ~loc (id : string) (c : class_) : method_ option =
+let rec check_has_method_opt ~loc id c =
   if c.class_name = "Object" then None
   else
     match has_method id c with
     | false -> check_has_method_opt ~loc id c.class_extends
     | true -> Hashtbl.find c.class_methods id |> Option.some
 
-let rec check_has_method ~loc (id : string) (c : class_) : method_ =
+let rec check_has_method ~loc id c =
   match check_has_method_opt ~loc id c with
   | None -> error ~loc "The method %s is not defined" id
   | Some m -> m
 
-let get_method (name : string) (loc : location) (args : pexpr list) (cls : class_) : method_ =
+let get_method name loc args cls =
   let meth = check_has_method ~loc name cls in
   if List.compare_lengths meth.meth_params args <> 0 then error ~loc "incorrect number of arguments";
   meth
 
 (* Update class with decls *)
 
-let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
+let update_class classes c decls =
   List.iter
     begin
       function
@@ -114,13 +114,12 @@ let update_class (classes : classes) (c : class_) (decls : pdecl list) : unit =
     end
     decls
 
-let update_classes (classes : classes) (p : pfile) : unit =
+let update_classes classes p =
   List.iter (fun (id, _parent, decls) -> update_class classes (Hashtbl.find classes id.id) decls) p
 
 (* Init vars and env for typing method & constr *)
 
-let env_from_params (classes : classes) (params : var list) (pparams : pparam list) :
-  var list * typing_env =
+let env_from_params classes params pparams =
   let vars, env =
     List.fold_left2
       begin
@@ -140,29 +139,29 @@ let env_from_params (classes : classes) (params : var list) (pparams : pparam li
 
 (*Verify if the class has the attributes*)
 
-let rec get_attribute ?(loc = dummy_loc) (id : string) (c : class_) : attribute =
+let rec get_attribute ?(loc = dummy_loc) id c =
   if c.class_name = "Object" then error ~loc "The attribute %s is not defined" id;
 
   match has_attribute id c with
   | false -> get_attribute ~loc id c.class_extends
   | true -> Hashtbl.find c.class_attributes id
 
-let check_has_attribute ~loc (id : string) (c : class_) : unit = get_attribute ~loc id c |> ignore
+let check_has_attribute ~loc id c = get_attribute ~loc id c |> ignore
 
 (* Verify we have a return ot not *)
 
-let rec have_return : pstmt_desc -> bool = function
+let rec have_return = function
   | PSreturn _ -> true
   | PSexpr _ | PSvar _ | PSfor _ -> false
   | PSif (_, s1, s2) -> have_return s1.pstmt_desc && have_return s2.pstmt_desc
   | PSblock block -> List.exists (fun s -> have_return s.pstmt_desc) block
 
-let have_not_return (s : pstmt_desc) : bool = not @@ have_return s
+let have_not_return s = not @@ have_return s
 
-let verify_have_return (loc : location) (name : string) (s : pstmt_desc) : unit =
+let verify_have_return loc name s =
   if have_not_return s then error ~loc "The method %s must have a return" name
 
-let verify_have_not_return (loc : location) (name : string) (s : pstmt_desc) : unit =
+let verify_have_not_return loc name s =
   if have_return s then error ~loc "The method %s must not have a return" name
 
 (* Type the args of a call *)

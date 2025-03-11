@@ -3,53 +3,88 @@ title: Rapport pour le _projet de Compilation_
 author: Hugo BARREIRO & Paul-Alexis RODRIGUEZ
 ---
 
+\newpage
+\tableofcontents
+\newpage
+
 # Compiler le projet
 
-Pour le compiler le projet, il suffit d'utiliser la commande ```make``` à la racine. Pour lancer les tests, on peut utiliser les commandes ```make test```, ```make test-typing``` et ```make test-compile``` également à la racine. Pour générer le ```.pdf``` du rapport, il faut utiliser ```make``` à l'intérieur du répertoire ```doc```.
+Pour le compiler le projet, il suffit d'utiliser la commande _make_ à la racine. Pour lancer les tests, on peut utiliser les commandes _make test_, _make test-typing_ et _make test-compile_ également à la racine. Pour générer le _.pdf_ du rapport, il faut utiliser _make_ à l'intérieur du répertoire _doc_.
 
 # Organisation du code
 
-Dans le répertoire ```src``` on trouve deux répertoires ```typing``` et ```compile```.
+Dans le répertoire _src_ on trouve deux répertoires _typing_ et _compile_.
 
-Dans ```typing```, on retrouve 4 fichiers différents :
-    - ```typing.ml```, contient les fonctions principales permettant de typer le programme.
-    - ```typing_print.ml```, contient des fonctions d'affichage pour du déboggage.
-    - ```typing_utils.ml```, contient des définitions, des fonctions d'une ligne et des fonctions simples permettant d'améliorer la lisiblité du code.
-    - ```typing_algo.ml```, contient des fonctions plus compliqués que celles de ```typing_utils.ml``` permettant d'alléger le fichier principal ```typing.ml```.
+Dans _typing_, on retrouve 4 fichiers différents :
 
-Dans ```compile```, on retrouve 3 fichiers différents :
-    - ```compile.ml```, contient les fonctions principales permettant de compiler le programme.
-    - ```compile_utils.ml```, contient des définitions et des fonctions, ne contenant pas d'assembleur, permettant d'alléger le fichier principal.
-    - ```compile_algo.ml```, contient des fonctions, contenant de l'assembleur, permettant d'alléger le fichier principal.
+- _typing.ml_, contient les fonctions principales permettant de typer le programme.
+- _typing_print.ml_, contient des fonctions d'affichage pour du déboggage.
+- _typing_utils.ml_, contient des définitions, des fonctions d'une ligne et des fonctions simples permettant d'améliorer la lisiblité du code.
+- _typing_algo.ml_, contient des fonctions plus compliqués que celles de _typing_utils.ml_ permettant d'alléger le fichier principal _typing.ml_.
+
+Dans _compile_, on retrouve 3 fichiers différents :
+
+- _compile.ml_, contient les fonctions principales permettant de compiler le programme.
+- _compile_utils.ml_, contient des définitions et des fonctions, ne contenant pas d'assembleur, permettant d'alléger le fichier principal.
+- _compile_algo.ml_, contient des fonctions, contenant de l'assembleur, permettant d'alléger le fichier principal.
 
 # Choix techniques
 
 ## Schéma de compilation
 
-Nous avons décidé de toujours laisser la valeur de la dernière expression compilée au sommet de la pile. Ceci permet de la récupérer aisément grâce à l'instruction ```popq```. De plus, l'avantage de ne pas stocker les valeurs des expressions dans les registres est d'être sûr de ne jamais écraser une valeur qui ne devait pas l'être.
+Nous avons décidé de toujours laisser la valeur de la dernière expression compilée au sommet de la pile. Ceci permet de la récupérer aisément grâce à l'instruction _popq_. De plus, l'avantage de ne pas stocker les valeurs des expressions dans les registres est d'être sûr de ne jamais écraser une valeur qui ne devait pas l'être.
 
-Pour les registres temporaires (pour compiler les expressions par exemple) nous avons décider d'utiliser les registres ```r12```, ```r13```, ```r14``` et ```r15```. En effet, ces registres sont ```callee-saved```. Ainsi, un appel de fonction (comme ```printf``` par exemple) ne peut pas écraser les valeurs stockés dans ces registres (au pire la fonction doit restaurer ces valeurs).
+Pour les registres temporaires (pour compiler les expressions par exemple) nous avons décider d'utiliser les registres _r12_, _r13_, _r14_ et _r15_. En effet, ces registres sont _callee-saved_. Ainsi, un appel de fonction (comme _printf_ par exemple) ne peut pas écraser les valeurs stockés dans ces registres (au pire la fonction doit restaurer ces valeurs).
 
-Pour ce qui est des appels de fonctions (```call``` et ```new```) nous suivont le schéma proposé dans le sujet. Il est de même pour les objets, c'est-à-dire qu'on utilise la structure proposée pour les ```descripteurs de classe``` et les ```attributs```.
+Pour ce qui est des appels de fonctions (_call_ et _new_) nous suivont le schéma proposé dans le sujet. Il est de même pour les objets, c'est-à-dire qu'on utilise la structure proposée pour les _descripteurs de classe_ et les _attributs_.
+
+## Choix
+
+### Typage
+
+Nous prétons attention à préciser la localisation des erreurs du mieux que possible. Ainsi, nous essayons d'utiliser les localisation les plus internes. Par exemple, lorsque _true && 2_ soulève une erreur, on indique la position de _2_ et non de _+_. Cela a pour effet négatif d'avoir un code plus verbeux par moment, mais cela vaut le coup à notre avis.
+
+De plus, nous avons décider de simplifier le _up-cast_ au typage. C'est-à-dire, qu'on ne place pas le _cast_ dans l'_ast_, on place l'expression qui devait être _casté_ seule. Ainsi, on "pert" du temps au typage mais cela va permettre de gagner un peu de temps à l'exécution, ce qui est souvent souhaitable. On remarque que si on voulait finalement gagner du temps au typage, on pourrait seulement supprimer cette simplification puisque le code à l'exécution est le même pour le _down-cast_ et le _up-cast_.
+
+### Compilation
+
+Nous avons décidé ne jamais laisser le programme _crasher_, par exemple avec une _segmentation fault_. Pour ce faire, on exécute un _exit 1_ lorsque neccessaire. Ainsi, on vérifie dynamiquement si on effectue une division (ou modulo) par 0 ou si on tente d'accéder à un objet _null_ lorsque que ce n'est pas possible.
 
 ## Implémentation
 
 ### Typage
 
-On utilise deux références globales : une pour la ```classe``` currente, une pour le type du ```return``` courent. Une autre solution aurait été des les stocker dans l'environnement mais ici ce n'est pas nécessaire car on ne peut pas définir une classe dans une classe et une méthode dans une méthode. Ainsi, la valeur de ces deux références sont toujours cohérentes.
+Tout d'abord, On utilise deux références globales : une pour la _classe_ currente, une pour le type du _return_ courent. Une autre solution aurait été des les stocker dans l'environnement mais ici ce n'est pas nécessaire car on ne peut pas définir une classe dans une classe et une méthode dans une méthode. Ainsi, la valeur de ces deux références sont toujours cohérentes.
 
-De plus, on utilise également une ```hashtbl``` globale pour stocker les différentes ```classes``` afin de pouvoir y accéder efficacement. 
+Ensuite, on utilise également une _hashtbl_ globale pour stocker les différentes _classes_ afin de pouvoir y accéder efficacement.
+
+Enfin, nous avons définie de nouveaux opérateur pour simplifier la lisibilité du typage :
+
+- =*, l'égalité sur les types, renvoie _true_ si et seulement si les classes sont les mêmes ou si les types atomiques sont les mêmes, renvoie _false_ sinon.
+- <>\*, définie simplement comme la négation de =*.
+- <=*, renvoie _true_ si le membre gauche est le sous-type du membre droit, renvoie _false_ sinon.
+- <=>*, renvoe  _true_ si l'un des deux membres est sous-type de l'autre, renvoie _false_ sinon.
 
 ### Compilation
 
-Nous avons choisi de compiler en deux temps : d'abord la partie ```text``` puis la partie ```data```. Pour la partie ```text```, on compile toutes les classes, puis les fonctions utilitaires telles que ```print_string``` par exemple. Pour la partie ```data```, nous avons créer une ```(string * string) Queue.t```. Ainsi, à chaque fois que l'on rencontre une string constante, on créer un nouveau ```label``` qu'on associe avec la string dans la ```queue```. Après, avoir compiler tout le code, nous avons donc toutes les strings contantes que l'on peut donc également compiler dans la partie ```data```. Nous avons utiliser la même idée pour les descripteurs de classe en utilisant une ```(string, data) Hashtbl.t```. Ainsi, à chaque fois que l'on rencontre une nouvelle classe, on créer son descripteur que l'on stocke dans la ```hashtbl```. Après avoir compiler toutes les classes, on dispose donc de tous les descripteurs. On peut alors les compiler dans la partie ```data```.
+Nous avons choisi de compiler en deux temps : d'abord la partie _text_ puis la partie _data_.
 
-Pour les constructions utilisant des ```labels``` comme ```if```, nous avons décidé de les compiler en utilisant une fonction extérieure à la fonction principale. Ainsi, on peut définir une fonction stockant dans sa cloture un compteur locale à la fonction (on ne peut pas y accéder en dehors) mas globale à la fonction. Ainsi, on peut numéroter nos labels indépendemment des autres. D'ailleurs, le compilateur OCaml m'a beaucoup surpris (il est très fort) : on peut passer en argument à une fonction, une fonction qui actuellement en train d'être définie afin de l'utiliser dans la définition de cette autre fonction :).
+Pour la partie _text_, on compile toutes les classes, puis les fonctions utilitaires telles que _print_string_ par exemple. 
+
+Pour la partie _data_, nous avons créer une _(string * string) Queue.t_. Ainsi, à chaque fois que l'on rencontre une string constante, on créer un nouveau _label_ qu'on associe avec la string dans la _queue_. Après, avoir compiler tout le code, nous avons donc toutes les strings contantes que l'on peut donc également compiler dans la partie _data_. Nous avons utiliser la même idée pour les descripteurs de classe en utilisant une _(string, data) Hashtbl.t_. Ainsi, à chaque fois que l'on rencontre une nouvelle classe, on créer son descripteur que l'on stocke dans la _hashtbl_. Après avoir compiler toutes les classes, on dispose donc de tous les descripteurs. On peut alors les compiler dans la partie _data_.
+
+Pour les constructions utilisant des _labels_ comme _if_, nous avons décidé de les compiler en utilisant une fonction extérieure à la fonction principale. Ainsi, on peut définir une fonction stockant dans sa cloture un compteur locale à la fonction (on ne peut pas y accéder en dehors) mas globale à la fonction. Ainsi, on peut numéroter nos labels indépendemment des autres. D'ailleurs, le compilateur OCaml nous a beaucoup surpris (il est très fort) : on peut passer en argument à une fonction, une fonction qui actuellement en train d'être définie afin de l'utiliser dans la définition de cette autre fonction...
 
 # Problèmes
 
-Nous avons rencontré des problèmes lors de la compilation de ```new()```.
-En effet au départ dans notre schéma de compilation, lors d'un appel à new, nous allouions un espace dans le tas, dont on récupérait l'adresse dans le registre rax. Nous rajoutions ensuite le descripteur de classe dans l'espace présent à l'adresse donnée par rax. Puis nous faisions un push sur la pile de l'adresse contenue dans rax. Ensuite nous compilions et empilions les arguments et ```this```, et enfin nous appelions le constructeur.
-Le problème étant que lorsque l'on faisait appel à des constructeurs récursifs, notamment pour les classes récursives (typiquement des listes chaînées, par exemple), le contenu du registre rax était écrasé par les nouveaux appels à ```malloc```. Ce qui avait pour conséquence de ne garder que la toute dernière instance créée, et non la première, dans la variable.
-Pour remédier à ce problème nous avons décidé de push le contenu de rax afin de conserver l'adresse renvoyée par malloc au sommet de la pile juste avant d'empiler les arguments et ```this``` pour l'appel au constructeur. De cette manière lorsque l'on dépile les arguments et ```this```, nous sommes sûrs de pouvoir récupérer la bonne instance de l'objet au sommet de la pile. Cependant nous avons constaté que cette version était problématique pour des raisons non-visibles dans le jeu de tests donné. En effet, dans la version précédente il y avait deux push de rax sur la pile, un avant la compilation des arguments et un après (le premier pour sauvegarder l'adresse et le deuxième pour permettre au constructeur d'accéder à l'objet avec this). Cependant pendant de la compilation des arguments rien n'empêche que l'expression d'un argument soit un appel à une fonction écrasant elle même le registre rax. Ceci est problématique puisque le deuxième push, va push rax (qui contient maintenant la valeur qui a écrasé l'objet).
-Pour remédier à ceci nous avons finalement décider de récuperer l'objet dans la pile à l'adresse où nous l'avions empilé auparavant avant de faire le deuxième push (ceci nous garantit d'empiler et de récuperer le bon objet). Le test ```tests/exec/perso1.java``` permet de vérifier que ceci ne soit plus le cas.
+Nous avons rencontré des problèmes lors de la compilation de _new()_.
+
+En effet au départ dans notre schéma de compilation, lors d'un appel à _new_, nous allouions un espace dans le tas, dont on récupérait l'adresse dans le registre _rax_. Nous rajoutions ensuite le _descripteur de classe_ dans l'espace présent à l'adresse donnée par _rax_. Puis nous faisions un _push_ sur la pile de l'adresse contenue dans _rax_. Ensuite nous compilions et empilions les arguments et _this_, et enfin nous appelions le constructeur.
+
+Le problème étant que lorsque l'on faisait appel à des constructeurs récursifs, notamment pour les classes récursives (typiquement des listes chaînées, par exemple), le contenu du registre _rax_ était écrasé par les nouveaux appels à _malloc_. Ce qui avait pour conséquence de ne garder que la toute dernière instance créée, et non la première, dans la variable.
+
+Pour remédier à ce problème nous avons décidé de _push_ le contenu de _rax_ afin de conserver l'adresse renvoyée par _malloc_ au sommet de la pile juste avant d'empiler les arguments et _this_ pour l'appel au constructeur. De cette manière lorsque l'on dépile les arguments et _this_, nous sommes sûrs de pouvoir récupérer la bonne instance de l'objet au sommet de la pile.
+
+Cependant nous avons constaté que cette version était problématique pour des raisons non-visibles dans le jeu de tests donné. En effet, dans la version précédente il y avait deux push de _rax_ sur la pile, un avant la compilation des arguments et un après (le premier pour sauvegarder l'adresse et le deuxième pour permettre au constructeur d'accéder à l'objet avec _this_). Or, pendant de la compilation des arguments rien n'empêche que l'expression d'un argument soit un appel à une fonction externe (telle que _printf_) écrasant elle même le registre _rax_. Ceci est problématique pour le deuxième _push_ de _rax_ (cd dernoer contient maintenant la valeur qui a écrasé l'objet).
+
+Pour remédier à ceci nous avons finalement décider de récuperer l'objet dans la pile à l'adresse où nous l'avions empilé auparavant avant de faire le deuxième _push_ (ceci nous garantit d'empiler et de récuperer le bon objet). Le test _tests/exec/perso1.java_ permet de vérifier que ceci ne soit plus le cas.
